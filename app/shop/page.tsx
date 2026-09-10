@@ -26,40 +26,65 @@ export default function ShopPage() {
   const { cart, addToCart, removeFromCart, updateQuantity, clearCart, totalAmount } = useCart()
   const supabase = createClient()
 
-  useEffect(() => {
-    async function loadData() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user?.email) setUserEmail(user.email)
+  // Berechnet den virtuellen Restbestand im Shop (Originalbestand minus Warenkorb)
+  const getEffectiveStock = (product: any) => {
+    if (!product) return { stockMain: 0, stockExt: 0, total: 0 }
 
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false })
+    const cartItem = cart.find((item) => item.id === product.id)
+    const qtyInCart = Number(cartItem?.quantity) || 0
 
-      if (!error && data) {
-        setProducts(data)
-        
-        // Initial für jede SKU die erste verfügbare Länge & Standardmenge = 1 setzen
-        const initialLengths: { [sku: string]: string } = {}
-        const initialQuantities: { [sku: string]: number } = {}
+    const rawMain = Number(product.stock_main) || 0
+    const rawExt = Number(product.stock_external) || 0
 
-        data.forEach(p => {
-          if (!initialLengths[p.sku] && p.length) {
-            initialLengths[p.sku] = p.length
-          }
-          if (!initialQuantities[p.sku]) {
-            initialQuantities[p.sku] = 1
-          }
-        })
-        setSelectedLengths(initialLengths)
-        setSelectedQuantities(initialQuantities)
-      }
-      setLoading(false)
+    // Erst Hauptlager, dann Außenlager abziehen
+    const deductMain = Math.min(rawMain, qtyInCart)
+    const remQty = qtyInCart - deductMain
+    const deductExt = Math.min(rawExt, remQty)
+
+    const stockMain = Math.max(0, rawMain - deductMain)
+    const stockExt = Math.max(0, rawExt - deductExt)
+    const total = stockMain + stockExt
+
+    return { stockMain, stockExt, total }
+  }
+
+  // Funktion zum Laden/Aktualisieren der Produktdaten aus Supabase
+  const fetchProducts = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user?.email) setUserEmail(user.email)
+
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .order('sku', { ascending: true }) 
+      .order('sku', { ascending: true })
+
+    if (!error && data) {
+      setProducts(data)
+      
+      // Initial für jede SKU die erste verfügbare Länge & Standardmenge = 1 setzen
+      const initialLengths: { [sku: string]: string } = {}
+      const initialQuantities: { [sku: string]: number } = {}
+
+      data.forEach(p => {
+        if (!initialLengths[p.sku] && p.length) {
+          initialLengths[p.sku] = p.length
+        }
+        if (!initialQuantities[p.sku]) {
+          initialQuantities[p.sku] = 1
+        }
+      })
+      setSelectedLengths(prev => ({ ...initialLengths, ...prev }))
+      setSelectedQuantities(prev => ({ ...initialQuantities, ...prev }))
     }
-    loadData()
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    fetchProducts()
   }, [])
 
-// 1. Nur Produkte berücksichtigen, die in mindestens einem Lager Bestand haben (> 0)
+  // 1. Nur Produkte berücksichtigen, die in mindestens einem Lager Bestand haben (> 0)
   const availableProducts = products.filter(
     (p) => (p.stock_main || 0) + (p.stock_external || 0) > 0
   )
@@ -90,38 +115,65 @@ export default function ShopPage() {
   // Wenn der Kunde auf "+ Hinzufügen" klickt, wird die eingestellte Menge übertragen
   const handleAddToCart = (sku: string) => {
     const group = groupedProducts[sku]
+    if (!group) return
+
     const selectedLength = selectedLengths[sku]
     const quantityToAdd = selectedQuantities[sku] || 1
     
     const productVariant = group.find(p => p.length === selectedLength) || group[0]
     
     if (productVariant) {
-      addToCart(productVariant, quantityToAdd)
+      // B2B-Einkaufspreis ermitteln (Fallback auf price_vk, falls price_ek nicht definiert oder 0 ist)
+      const ekPrice = (Number(productVariant.price_ek) > 0) 
+        ? Number(productVariant.price_ek) 
+        : Number(productVariant.price_vk)
+
+      const itemForCart = {
+        ...productVariant,
+        price_ek: ekPrice
+      }
+
+      addToCart(itemForCart, quantityToAdd)
     }
   }
 
   const handleCheckout = async () => {
-    if (cart.length === 0) return
-    setOrderSubmitting(true)
+      if (cart.length === 0 || orderSubmitting) return
 
-    try {
-      const res = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: cart, totalAmount, userEmail }),
-      })
+      setOrderSubmitting(true)
 
-      if (res.ok) {
-        setOrderSuccess(true)
+      try {
+        // API Route aufrufen (macht Bestand + Order-Save + Mail)
+        const response = await fetch('/api/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: cart,
+            totalAmount,
+            userEmail,
+          }),
+        })
+
+        const result = await response.json()
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Fehler beim Verarbeiten der Bestellung')
+        }
+
+        // Warenkorb leeren & Erfolgsmeldung anzeigen
         clearCart()
-      } else {
-        alert('Fehler beim Absenden der Bestellung.')
+        setOrderSuccess(true)
+
+        // Produkte neu laden, um die aktualisierten Bestände in der UI zu haben
+        await fetchProducts()
+
+      } catch (error: any) {
+        console.error('Checkout Fehler:', error)
+        alert(`Bestellung konnte nicht verarbeitet werden: ${error.message}`)
+      } finally {
+        setOrderSubmitting(false)
       }
-    } catch (e) {
-      alert('Netzwerkfehler beim Absenden der Bestellung.')
     }
-    setOrderSubmitting(false)
-  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -147,7 +199,7 @@ export default function ShopPage() {
               🛒 {t('shop.cart')}
               {cart.length > 0 && (
                 <span className="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                  {cart.reduce((sum, item) => sum + item.quantity, 0)}
+                  {cart.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)}
                 </span>
               )}
             </button>
@@ -239,11 +291,14 @@ export default function ShopPage() {
                           >
                             {availableLengths.map((len) => {
                               const variant = group.find(p => p.length === len)
-                              const totalStock = (variant?.stock_main || 0) + (variant?.stock_external || 0)
+                              if (!variant) return null
+
+                              // Virtuellen Restbestand berechnen
+                              const { total: effectiveTotal } = getEffectiveStock(variant)
 
                               return (
                                 <option key={len} value={len}>
-                                  {len} {totalStock > 0 ? `(${t('shop.stock')}: ${totalStock})` : `(${t('shop.out_of_stock')})`}
+                                  {len} {effectiveTotal > 0 ? `(${t('shop.stock')}: ${effectiveTotal})` : `(${t('shop.out_of_stock')})`}
                                 </option>
                               )
                             })}
@@ -252,27 +307,50 @@ export default function ShopPage() {
                       )}
                     </div>
 
-                    {/* Detaillierter, mehrsprachiger Lieferzeit-Status */}
+                    {/* Detaillierter, reaktiver Lieferzeit-Status */}
                     <div className="mb-4 text-xs">
-                      {activeVariant && (activeVariant.stock_main || 0) > 0 ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-medium">
-                          <span>🟢</span> {t('shop.warehouse_main')} ({(activeVariant.stock_main || 0)} Stk.)
-                        </span>
-                      ) : activeVariant && (activeVariant.stock_external || 0) > 0 ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200 font-medium">
-                          <span>🟠</span> {t('shop.warehouse_external')} ({(activeVariant.stock_external || 0)} Stk.)
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-50 text-red-800 border border-red-200 font-medium">
-                          <span>🔴</span> {t('shop.out_of_stock')}
-                        </span>
-                      )}
+                      {(() => {
+                        const { stockMain, stockExt } = getEffectiveStock(activeVariant)
+
+                        if (stockMain > 0) {
+                          return (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-medium">
+                              <span>🟢</span> {t('shop.warehouse_main')} ({stockMain} Stk.)
+                            </span>
+                          )
+                        } else if (stockExt > 0) {
+                          return (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200 font-medium">
+                              <span>🟠</span> {t('shop.warehouse_external')} ({stockExt} Stk.)
+                            </span>
+                          )
+                        } else {
+                          return (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-50 text-red-800 border border-red-200 font-medium">
+                              <span>🔴</span> {t('shop.out_of_stock')}
+                            </span>
+                          )
+                        }
+                      })()}
                     </div>
 
                     <div className="border-t pt-4 flex justify-between items-end mt-2">
+                      {/* B2B EK-Preis groß & Prominent, UVP/VK klein darüber/darunter */}
                       <div>
-                        <div className="text-xs text-gray-400">{t('shop.price_b2b')}</div>
-                        <div className="text-xl font-bold text-gray-900">{activeVariant.price_vk.toFixed(2)} €</div>
+                        {/* Unverbindlicher Verkaufspreis (UVP / VK) - klein, ohne Durchstreichung */}
+                        {activeVariant.price_vk > 0 && (
+                          <div className="text-[11px] font-medium text-gray-500">
+                            {t('shop.price_uvp') || 'UVP'}: {activeVariant.price_vk.toFixed(2)} €
+                          </div>
+                        )}
+
+                        {/* B2B Einkaufspreis (EK) - groß & hervorgehoben */}
+                        <div className="text-xs font-bold text-blue-600 uppercase tracking-wide mt-0.5">
+                          {t('shop.price_b2b') || 'Ihr B2B Preis'}
+                        </div>
+                        <div className="text-2xl font-black text-gray-900 leading-tight">
+                          {(activeVariant.price_ek || activeVariant.price_vk).toFixed(2)} €
+                        </div>
                       </div>
                       
                       {/* Mengeneingabe & Add Button */}
@@ -312,19 +390,19 @@ export default function ShopPage() {
           <div className="bg-white w-full max-w-md h-full flex flex-col p-6 shadow-xl">
             <div className="flex justify-between items-center border-b pb-4 mb-4">
               <h2 className="text-lg font-bold">{t('shop.cart')}</h2>
-              <button onClick={() => setIsCartOpen(false)} className="text-gray-500 hover:text-black">✕</button>
+              <button onClick={() => { setIsCartOpen(false); setOrderSuccess(false); }} className="text-gray-500 hover:text-black">✕</button>
             </div>
 
             {orderSuccess ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center">
                 <span className="text-4xl mb-2">✅</span>
-                <h3 className="text-xl font-bold text-green-600 mb-2">{t('shop.order_success_title')}</h3>
-                <p className="text-sm text-gray-600 mb-6">{t('shop.order_success_sub')}</p>
+                <h3 className="text-xl font-bold text-green-600 mb-2">{t('shop.order_success_title') || 'Vielen Dank!'}</h3>
+                <p className="text-sm text-gray-600 mb-6">{t('shop.order_success_sub') || 'Ihre Bestellung wurde erfolgreich übermittelt und der Bestand aktualisiert.'}</p>
                 <button
                   onClick={() => { setOrderSuccess(false); setIsCartOpen(false); }}
-                  className="bg-slate-900 text-white px-4 py-2 rounded text-sm"
+                  className="bg-slate-900 text-white px-4 py-2 rounded text-sm font-medium"
                 >
-                  {t('shop.back_to_shop')}
+                  {t('shop.back_to_shop') || 'Zurück zum Shop'}
                 </button>
               </div>
             ) : (
@@ -333,29 +411,45 @@ export default function ShopPage() {
                   {cart.length === 0 ? (
                     <p className="text-gray-400 text-center py-8">{t('shop.empty_cart')}</p>
                   ) : (
-                    cart.map((item) => (
-                      <div key={item.id} className="flex justify-between items-center border-b pb-3">
-                        <div>
-                          <div className="font-bold text-sm">{item.brand} - {item.title}</div>
-                          <div className="text-xs text-gray-500">
-                            SKU: {item.sku} {item.length && `| ${item.length}`} | {item.price_vk.toFixed(2)} €
+                    cart.map((item) => {
+                      const itemEkPrice = item.price_ek || item.price_vk || 0
+                      const itemSubtotal = itemEkPrice * item.quantity
+
+                      return (
+                        <div key={item.id} className="flex justify-between items-center border-b pb-3">
+                          <div>
+                            <div className="font-bold text-sm">{item.brand} - {item.title}</div>
+                            <div className="text-xs text-gray-500">
+                              SKU: {item.sku} {item.length && `| ${item.length}`}
+                            </div>
+                            {/* Einzel-EK-Preis & Positions-Gesamtsumme */}
+                            <div className="text-xs text-blue-600 font-bold mt-0.5">
+                              {itemEkPrice.toFixed(2)} € <span className="text-gray-400 font-normal">/ Stk.</span>
+                              <span className="text-gray-700 font-bold ml-2">(Gesamt: {itemSubtotal.toFixed(2)} €)</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min="1"
+                              value={item.quantity || 1}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10)
+                                updateQuantity(item.id, isNaN(val) ? 1 : val)
+                              }}
+                              className="w-12 p-1 border text-center rounded text-sm font-semibold bg-gray-50 focus:bg-white"
+                            />
+                            <button 
+                              onClick={() => removeFromCart(item.id)} 
+                              className="text-red-500 text-xs hover:underline p-1"
+                            >
+                              ✕
+                            </button>
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            min="1"
-                            value={item.quantity}
-                            onChange={(e) => updateQuantity(item.id, parseInt(e.target.value) || 1)}
-                            className="w-12 p-1 border text-center rounded text-sm"
-                          />
-                          <button onClick={() => removeFromCart(item.id)} className="text-red-500 text-xs hover:underline">
-                            ✕
-                          </button>
-                        </div>
-                      </div>
-                    ))
+                      )
+                    })
                   )}
                 </div>
 

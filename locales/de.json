@@ -27,6 +27,7 @@
     "back_to_shop": "Zurück zum Shop",
     "warehouse_main": "Hauptlager (1-2 Tage)",
     "warehouse_external": "Ext.Lager (3-5 Tage)",
-    "out_of_stock": "Ausverkauft"
+    "out_of_stock": "Ausverkauft",
+    "price_uvp": "UVP (brutto)"
   }
 }

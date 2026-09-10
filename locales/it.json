@@ -17,7 +17,6 @@
     "all_brands": "Tutte le marche",
     "select_length": "Seleziona lunghezza",
     "stock": "Disponibilità",
-    "price_b2b": "Prezzo B2B (Netto)",
     "add_to_cart": "+ Aggiungi",
     "empty_cart": "Il carrello è vuoto.",
     "total": "Totale (Netto)",
@@ -27,6 +26,8 @@
     "back_to_shop": "Torna allo shop",
     "warehouse_main": "Magazzino centrale (1-2 gg)",
     "warehouse_external": "Magazzino esterno (3-5 gg)",
-    "out_of_stock": "Esaurito"
+    "out_of_stock": "Esaurito",
+    "price_b2b": "Prezzo B2B (netto)",
+    "price_uvp": "Prezzo consigliato (UVP)"
   }
 }

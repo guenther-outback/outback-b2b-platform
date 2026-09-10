@@ -17,7 +17,6 @@
     "all_brands": "All Brands",
     "select_length": "Select length",
     "stock": "Stock",
-    "price_b2b": "B2B Price (Net)",
     "add_to_cart": "+ Add to Cart",
     "empty_cart": "Your cart is empty.",
     "total": "Total Amount (Net)",
@@ -27,6 +26,8 @@
     "back_to_shop": "Back to Shop",
     "warehouse_main": "Main Warehouse (1-2 days)",
     "warehouse_external": "External Warehouse (3-5 days)",
-    "out_of_stock": "Out of stock"
+    "out_of_stock": "Out of stock",
+    "price_b2b": "B2B Price (net)",
+    "price_uvp": "MSRP (gross)"
   }
 }

@@ -9,6 +9,9 @@ export interface CartItem {
   sku: string
   length?: string
   price_vk: number
+  price_ek: number
+  stock_main?: number      // <--- HINZUGEFÜGT
+  stock_external?: number  // <--- HINZUGEFÜGT
   quantity: number
 }
 
@@ -37,6 +40,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [cart])
 
   const addToCart = (product: any, quantity: number) => {
+    // EK-Preis ermitteln (Fallback auf price_vk, falls price_ek nicht vorhanden oder 0 ist)
+    const ekPrice = Number(product.price_ek) > 0 
+      ? Number(product.price_ek) 
+      : Number(product.price_vk || 0)
+
+    const vkPrice = Number(product.price_vk) || 0
+
     setCart((prevCart) => {
       const existing = prevCart.find((item) => item.id === product.id)
       if (existing) {
@@ -54,7 +64,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           brand: product.brand,
           sku: product.sku,
           length: product.length,
-          price_vk: product.price_vk,
+          price_ek: ekPrice, // <--- B2B-Einkaufspreis hinterlegt
+          price_vk: vkPrice,
+          stock_main: Number(product.stock_main) || 0,        // <--- HINZUGEFÜGT
+          stock_external: Number(product.stock_external) || 0,// <--- HINZUGEFÜGT
           quantity,
         },
       ]
@@ -74,10 +87,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clearCart = () => setCart([])
 
-  const totalAmount = cart.reduce(
-    (sum, item) => sum + item.price_vk * item.quantity,
-    0
-  )
+  // Gesamtsumme strikt basierend auf price_ek berechnen
+  const totalAmount = cart.reduce((sum, item) => {
+    const price = item.price_ek || item.price_vk || 0
+    return sum + price * item.quantity
+  }, 0)
 
   return (
     <CartContext.Provider
