@@ -26,6 +26,7 @@
     "order_success_sub": "Abbiamo ricevuto il tuo ordine e inviato una conferma a info@outback.it.",
     "back_to_shop": "Torna allo shop",
     "warehouse_main": "Magazzino centrale (1-2 gg)",
-    "warehouse_external": "Magazzino esterno (3-5 gg)"
+    "warehouse_external": "Magazzino esterno (3-5 gg)",
+    "out_of_stock": "Esaurito"
   }
 }

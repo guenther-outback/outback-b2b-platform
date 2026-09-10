@@ -26,6 +26,7 @@
     "order_success_sub": "We have received your order and sent a confirmation to info@outback.it.",
     "back_to_shop": "Back to Shop",
     "warehouse_main": "Main Warehouse (1-2 days)",
-    "warehouse_external": "External Warehouse (3-5 days)"
+    "warehouse_external": "External Warehouse (3-5 days)",
+    "out_of_stock": "Out of stock"
   }
 }

@@ -59,24 +59,31 @@ export default function ShopPage() {
     loadData()
   }, [])
 
-  // 1. Produkte nach SKU gruppieren
-  const groupedProducts = products.reduce((acc: { [key: string]: any[] }, product) => {
+// 1. Nur Produkte berücksichtigen, die in mindestens einem Lager Bestand haben (> 0)
+  const availableProducts = products.filter(
+    (p) => (p.stock_main || 0) + (p.stock_external || 0) > 0
+  )
+
+  // 2. Verfügbare Produkte nach SKU gruppieren
+  const groupedProducts = availableProducts.reduce((acc: { [key: string]: any[] }, product) => {
     const key = product.sku
     if (!acc[key]) acc[key] = []
     acc[key].push(product)
     return acc
   }, {})
 
-  const brands = Array.from(new Set(products.map((p) => p.brand).filter(Boolean)))
+  const brands = Array.from(new Set(availableProducts.map((p) => p.brand).filter(Boolean)))
 
-  // 2. Gruppierte Produkte filtern
+  // 3. Gruppierte Produkte nach Suchbegriff und Marke filtern
   const groupedKeys = Object.keys(groupedProducts).filter((sku) => {
     const group = groupedProducts[sku]
     const mainItem = group[0]
     
-    const matchesSearch = mainItem.title.toLowerCase().includes(search.toLowerCase()) || 
-                          sku.toLowerCase().includes(search.toLowerCase())
+    const matchesSearch =
+      mainItem.title.toLowerCase().includes(search.toLowerCase()) || 
+      sku.toLowerCase().includes(search.toLowerCase())
     const matchesBrand = selectedBrand === '' || mainItem.brand === selectedBrand
+
     return matchesSearch && matchesBrand
   })
 
@@ -219,7 +226,7 @@ export default function ShopPage() {
                       </div>
                       <h3 className="font-bold text-gray-800 text-lg mb-2">{mainItem.title}</h3>
                       
-                      {/* Längenauswahl */}
+                      {/* Längenauswahl Dropdown */}
                       {availableLengths.length > 0 && (
                         <div className="mb-4">
                           <label className="block text-xs font-semibold text-gray-600 mb-1">
@@ -228,30 +235,39 @@ export default function ShopPage() {
                           <select
                             value={currentLength}
                             onChange={(e) => setSelectedLengths({ ...selectedLengths, [sku]: e.target.value })}
-                            className="w-full p-1.5 border border-gray-300 rounded text-sm bg-gray-50 focus:bg-white"
+                            className="w-full p-2 border border-gray-300 rounded text-sm bg-gray-50 focus:bg-white font-medium"
                           >
-                            {availableLengths.map((len) => (
-                              <option key={len} value={len}>
-                                {len} {group.find(p => p.length === len)?.stock_quantity ? `(${t('shop.stock')}: ${group.find(p => p.length === len)?.stock_quantity})` : ''}
-                              </option>
-                            ))}
+                            {availableLengths.map((len) => {
+                              const variant = group.find(p => p.length === len)
+                              const totalStock = (variant?.stock_main || 0) + (variant?.stock_external || 0)
+
+                              return (
+                                <option key={len} value={len}>
+                                  {len} {totalStock > 0 ? `(${t('shop.stock')}: ${totalStock})` : `(${t('shop.out_of_stock')})`}
+                                </option>
+                              )
+                            })}
                           </select>
                         </div>
                       )}
                     </div>
 
-                  {/* Lagerstandort Badge */}
-                  <div className="mt-2 mb-3">
-                    {activeVariant.location_type === 'external_warehouse' ? (
-                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
-                        <span>🟠</span> {t('shop.warehouse_external')}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
-                        <span>🟢</span> {t('shop.warehouse_main')}
-                      </span>
-                    )}
-                  </div>
+                    {/* Detaillierter, mehrsprachiger Lieferzeit-Status */}
+                    <div className="mb-4 text-xs">
+                      {activeVariant && (activeVariant.stock_main || 0) > 0 ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-medium">
+                          <span>🟢</span> {t('shop.warehouse_main')} ({(activeVariant.stock_main || 0)} Stk.)
+                        </span>
+                      ) : activeVariant && (activeVariant.stock_external || 0) > 0 ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200 font-medium">
+                          <span>🟠</span> {t('shop.warehouse_external')} ({(activeVariant.stock_external || 0)} Stk.)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-50 text-red-800 border border-red-200 font-medium">
+                          <span>🔴</span> {t('shop.out_of_stock')}
+                        </span>
+                      )}
+                    </div>
 
                     <div className="border-t pt-4 flex justify-between items-end mt-2">
                       <div>
@@ -282,8 +298,6 @@ export default function ShopPage() {
                       </div>
                     </div>
                   </div>
-
-
 
                 </div>
               )

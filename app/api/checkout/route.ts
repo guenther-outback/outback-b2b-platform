@@ -55,15 +55,20 @@ export async function POST(request: Request) {
     }
 
     // 3. HTML-Tabelle für die E-Mail generieren
-    const itemsHtml = items.map((item: any) => `
-      <tr>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.sku}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>${item.brand}</strong> - ${item.title} ${item.length ? `(${item.length})` : ''}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">${item.quantity}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${item.price_vk.toFixed(2)} €</td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${(item.price_vk * item.quantity).toFixed(2)} €</td>
-      </tr>
-    `).join('')
+const itemsHtml = items.map((item: any) => `
+  <tr>
+    <td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.sku}</td>
+    <td style="padding: 8px; border-bottom: 1px solid #ddd;">
+      <strong>${item.brand}</strong> - ${item.title} ${item.length ? `(${item.length})` : ''}<br/>
+      <small style="color: ${item.location_type === 'external_warehouse' ? '#d97706' : '#059669'};">
+        Lager: ${item.location_type === 'external_warehouse' ? 'Externes Händlerlager' : 'Hauptlager'}
+      </small>
+    </td>
+    <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">${item.quantity}</td>
+    <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${item.price_vk.toFixed(2)} €</td>
+    <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${(item.price_vk * item.quantity).toFixed(2)} €</td>
+  </tr>
+`).join('')
 
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; color: #333;">
