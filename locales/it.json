@@ -1,0 +1,31 @@
+{
+  "login": {
+    "title": "Portale B2B Outback",
+    "sub_email": "Inserisci il tuo indirizzo email registrato",
+    "sub_code": "Inserisci il codice ricevuto via email",
+    "email_label": "Indirizzo Email",
+    "code_label": "Codice a 6 cifre",
+    "btn_request": "Richiedi codice",
+    "btn_verify": "Accedi",
+    "btn_change_email": "Usa un'altra email"
+  },
+  "shop": {
+    "logged_in_as": "Connesso come",
+    "cart": "Carrello",
+    "logout": "Disconnetti",
+    "search_placeholder": "Cerca articolo o SKU...",
+    "all_brands": "Tutte le marche",
+    "select_length": "Seleziona lunghezza",
+    "stock": "Disponibilità",
+    "price_b2b": "Prezzo B2B (Netto)",
+    "add_to_cart": "+ Aggiungi",
+    "empty_cart": "Il carrello è vuoto.",
+    "total": "Totale (Netto)",
+    "checkout_btn": "Invia ordine",
+    "order_success_title": "Ordine inviato con successo!",
+    "order_success_sub": "Abbiamo ricevuto il tuo ordine e inviato una conferma a info@outback.it.",
+    "back_to_shop": "Torna allo shop",
+    "warehouse_main": "Magazzino centrale (1-2 gg)",
+    "warehouse_external": "Magazzino esterno (3-5 gg)"
+  }
+}

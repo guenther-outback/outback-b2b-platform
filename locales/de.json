@@ -1,0 +1,31 @@
+{
+  "login": {
+    "title": "Outback B2B Portal",
+    "sub_email": "Gib deine registrierte E-Mail-Adresse ein",
+    "sub_code": "Gib den per E-Mail erhaltenen Code ein",
+    "email_label": "E-Mail Adresse",
+    "code_label": "6-stelliger Code",
+    "btn_request": "Code anfordern",
+    "btn_verify": "Anmelden",
+    "btn_change_email": "Andere E-Mail verwenden"
+  },
+  "shop": {
+    "logged_in_as": "Angemeldet als",
+    "cart": "Warenkorb",
+    "logout": "Abmelden",
+    "search_placeholder": "Artikel oder SKU suchen...",
+    "all_brands": "Alle Marken",
+    "select_length": "Länge wählen",
+    "stock": "Bestand",
+    "price_b2b": "B2B Preis (EK)",
+    "add_to_cart": "+ Hinzufügen",
+    "empty_cart": "Der Warenkorb ist leer.",
+    "total": "Gesamtsumme (Netto)",
+    "checkout_btn": "Verbindlich Bestellen",
+    "order_success_title": "Bestellung abgeschickt!",
+    "order_success_sub": "Wir haben deine Bestellung erhalten und eine Bestätigung an info@outback.it gesendet.",
+    "back_to_shop": "Zurück zum Shop",
+    "warehouse_main": "Hauptlager (1-2 Tage)",
+    "warehouse_external": "Ext.Lager (3-5 Tage)"
+  }
+}
