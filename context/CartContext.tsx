@@ -8,6 +8,7 @@ export interface CartItem {
   brand: string
   sku: string
   length?: string
+  color?: string // <-- HIEREIN EINGEFÜGT
   price_vk: number
   price_ek: number
   stock_main?: number      // <--- HINZUGEFÜGT
