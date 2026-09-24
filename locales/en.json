@@ -28,6 +28,14 @@
     "warehouse_external": "External Warehouse (3-5 days)",
     "out_of_stock": "Out of stock",
     "price_b2b": "B2B Price (net)",
-    "price_uvp": "MSRP (gross)"
+    "price_uvp": "MSRP (gross)",
+    "cart_note_label": "💬 Order comments (Optional):",
+    "cart_note_placeholder": "E.g. desired delivery date, reference...",
+    "cart_remove_item": "Remove item",
+    "cart_stock_split_both": "🟢 {main}x Main Whse. + 🟠 {ext}x Ext. Whse.",
+    "cart_stock_split_main": "🟢 {qty}x Main Warehouse",
+    "cart_stock_split_ext": "🟠 {qty}x External Warehouse",
+    "cart_unit_price": "/ pcs.",
+    "cart_subtotal": "Total:"
   }
 }

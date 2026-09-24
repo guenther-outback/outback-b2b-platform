@@ -100,23 +100,35 @@ export default function ShopPage() {
   )
 
   // 2. Verfügbare Produkte nach SKU gruppieren
-  const groupedProducts = availableProducts.reduce((acc: { [key: string]: any[] }, product) => {
-    const key = product.sku
+// Helper: Stamm-SKU ohne Längen-Suffix extrahieren (z.B. A19-PR-FC-BE statt A19-PR-FC-BE-115)
+  const getParentGroupKey = (product: any) => {
+    if (product.title && product.brand) {
+      // Gruppiert sicher alle Längen des gleichen Modells zusammen
+      return `${product.brand.trim().toUpperCase()}_${product.title.trim().toLowerCase()}`
+    }
+    // Fallback: Schneidet Bindestrich-Suffixe ab (z.B. -115)
+    return product.sku ? product.sku.replace(/-\d+$/, '') : product.id
+  }
+
+  // 1. Produkte nach Modell (Stamm-SKU / Titel) gruppieren
+  const groupedProducts = products.reduce((acc: { [key: string]: any[] }, product) => {
+    const key = getParentGroupKey(product)
     if (!acc[key]) acc[key] = []
     acc[key].push(product)
     return acc
   }, {})
 
-  const brands = Array.from(new Set(availableProducts.map((p) => p.brand).filter(Boolean)))
+  const brands = Array.from(new Set(products.map((p) => p.brand).filter(Boolean)))
 
-  // 3. Gruppierte Produkte nach Suchbegriff und Marke filtern
-  const groupedKeys = Object.keys(groupedProducts).filter((sku) => {
-    const group = groupedProducts[sku]
+  // 2. Gruppierte Modelle nach Suchbegriff und Marke filtern
+  const groupedKeys = Object.keys(groupedProducts).filter((groupKey) => {
+    const group = groupedProducts[groupKey]
     const mainItem = group[0]
     
     const matchesSearch =
       mainItem.title.toLowerCase().includes(search.toLowerCase()) || 
-      sku.toLowerCase().includes(search.toLowerCase())
+      group.some((p: any) => p.sku.toLowerCase().includes(search.toLowerCase()))
+    
     const matchesBrand = selectedBrand === '' || mainItem.brand === selectedBrand
 
     return matchesSearch && matchesBrand
@@ -308,7 +320,9 @@ export default function ShopPage() {
                     <div>
                       <div className="flex justify-between items-start mb-1">
                         <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">{mainItem.brand}</span>
-                        <span className="text-xs text-gray-400">SKU: {sku}</span>
+                          <span className="text-xs text-gray-400">
+                            SKU: {activeVariant.sku}
+                          </span>
                       </div>
                       <h3 className="font-bold text-gray-800 text-lg mb-2">{mainItem.title}</h3>
                       
@@ -420,7 +434,7 @@ export default function ShopPage() {
         )}
       </main>
 
-      {/* Warenkorb Sidebar */}
+{/* Warenkorb Sidebar */}
       {isCartOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-end">
           <div className="bg-white w-full max-w-md h-full flex flex-col p-6 shadow-xl">
@@ -432,13 +446,13 @@ export default function ShopPage() {
             {orderSuccess ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center">
                 <span className="text-4xl mb-2">✅</span>
-                <h3 className="text-xl font-bold text-green-600 mb-2">{t('shop.order_success_title') || 'Vielen Dank!'}</h3>
-                <p className="text-sm text-gray-600 mb-6">{t('shop.order_success_sub') || 'Ihre Bestellung wurde erfolgreich übermittelt und der Bestand aktualisiert.'}</p>
+                <h3 className="text-xl font-bold text-green-600 mb-2">{t('shop.order_success_title')}</h3>
+                <p className="text-sm text-gray-600 mb-6">{t('shop.order_success_sub')}</p>
                 <button
                   onClick={() => { setOrderSuccess(false); setIsCartOpen(false); }}
                   className="bg-slate-900 text-white px-4 py-2 rounded text-sm font-medium"
                 >
-                  {t('shop.back_to_shop') || 'Zurück zum Shop'}
+                  {t('shop.back_to_shop')}
                 </button>
               </div>
             ) : (
@@ -464,27 +478,29 @@ export default function ShopPage() {
                               SKU: {item.sku} {item.length && `| ${item.length}`}
                             </div>
 
-                            {/* Transparentes Lager-Badge im Warenkorb */}
+                            {/* Dynamischer, übersetzter Lager-Status */}
                             <div className="text-[11px] font-medium mt-0.5">
                               {mainQty > 0 && extQty > 0 ? (
                                 <span className="text-blue-600 font-semibold">
-                                  🟢 {mainQty}x Hauptlager + 🟠 {extQty}x Ext. Lager
+                                  {t('shop.cart_stock_split_both')
+                                    .replace('{main}', String(mainQty))
+                                    .replace('{ext}', String(extQty))}
                                 </span>
                               ) : mainQty > 0 ? (
                                 <span className="text-emerald-700 font-semibold">
-                                  🟢 {qty}x Hauptlager
+                                  {t('shop.cart_stock_split_main').replace('{qty}', String(qty))}
                                 </span>
                               ) : (
                                 <span className="text-amber-700 font-semibold">
-                                  🟠 {qty}x Ext. Lager
+                                  {t('shop.cart_stock_split_ext').replace('{qty}', String(qty))}
                                 </span>
                               )}
                             </div>
 
                             {/* Einzelpreis & Positionssumme */}
                             <div className="text-xs text-blue-600 font-bold mt-0.5">
-                              {itemEkPrice.toFixed(2)} € <span className="text-gray-400 font-normal">/ Stk.</span>
-                              <span className="text-gray-700 font-bold ml-2">(Gesamt: {itemSubtotal.toFixed(2)} €)</span>
+                              {itemEkPrice.toFixed(2)} € <span className="text-gray-400 font-normal">{t('shop.cart_unit_price')}</span>
+                              <span className="text-gray-700 font-bold ml-2">({t('shop.cart_subtotal')} {itemSubtotal.toFixed(2)} €)</span>
                             </div>
                           </div>
 
@@ -503,7 +519,7 @@ export default function ShopPage() {
                             <button 
                               onClick={() => removeFromCart(item.id)} 
                               className="text-red-500 text-xs hover:underline p-1"
-                              title="Artikel entfernen"
+                              title={t('shop.cart_remove_item')}
                             >
                               ✕
                             </button>
@@ -519,13 +535,13 @@ export default function ShopPage() {
                     {/* Anmerkungen / Kommentarfeld */}
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">
-                        💬 Anmerkung zur Bestellung (Optional):
+                        {t('shop.cart_note_label')}
                       </label>
                       <textarea
                         rows={2}
                         value={orderNote}
                         onChange={(e) => setOrderNote(e.target.value)}
-                        placeholder="Z.B. Lieferterminwunsch, Kommission..."
+                        placeholder={t('shop.cart_note_placeholder')}
                         className="w-full p-2 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500"
                       />
                     </div>

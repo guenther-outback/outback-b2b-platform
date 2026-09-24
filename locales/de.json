@@ -28,6 +28,14 @@
     "warehouse_main": "Hauptlager (1-2 Tage)",
     "warehouse_external": "Ext.Lager (3-5 Tage)",
     "out_of_stock": "Ausverkauft",
-    "price_uvp": "UVP (brutto)"
+    "price_uvp": "UVP (brutto)",
+    "cart_note_label": "💬 Anmerkung zur Bestellung (Optional):",
+    "cart_note_placeholder": "Z.B. Lieferterminwunsch, Kommission...",
+    "cart_remove_item": "Artikel entfernen",
+    "cart_stock_split_both": "🟢 {main}x Hauptlager + 🟠 {ext}x Ext. Lager",
+    "cart_stock_split_main": "🟢 {qty}x Hauptlager",
+    "cart_stock_split_ext": "🟠 {qty}x Ext. Lager",
+    "cart_unit_price": "/ Stk.",
+    "cart_subtotal": "Gesamt:"    
   }
 }

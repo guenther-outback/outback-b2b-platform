@@ -28,6 +28,14 @@
     "warehouse_external": "Magazzino esterno (3-5 gg)",
     "out_of_stock": "Esaurito",
     "price_b2b": "Prezzo B2B (netto)",
-    "price_uvp": "Prezzo consigliato (UVP)"
+    "price_uvp": "Prezzo consigliato (UVP)",
+    "cart_note_label": "💬 Note sull'ordine (Opzionale):",
+    "cart_note_placeholder": "Es. Data di consegna desiderata, commissione...",
+    "cart_remove_item": "Rimuovi articolo",
+    "cart_stock_split_both": "🟢 {main}x Magazzino Princ. + 🟠 {ext}x Mag. Esterno",
+    "cart_stock_split_main": "🟢 {qty}x Magazzino Principale",
+    "cart_stock_split_ext": "🟠 {qty}x Magazzino Esterno",
+    "cart_unit_price": "/ pz.",
+    "cart_subtotal": "Totale:"
   }
 }
