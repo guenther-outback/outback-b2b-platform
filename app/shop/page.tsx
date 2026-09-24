@@ -16,13 +16,11 @@ export default function ShopPage() {
   const [orderSubmitting, setOrderSubmitting] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [orderSuccess, setOrderSuccess] = useState(false)
-  const [orderNote, setOrderNote] = useState('') // State für den Bestellkommentar
+  const [orderNote, setOrderNote] = useState('')
 
   const { t } = useLanguage()
   
-  // Zustand für die ausgewählte Länge pro SKU
   const [selectedLengths, setSelectedLengths] = useState<{ [sku: string]: string }>({})
-  // Zustand für die ausgewählte Bestellmenge pro SKU
   const [selectedQuantities, setSelectedQuantities] = useState<{ [sku: string]: number }>({})
 
   const { cart, addToCart, removeFromCart, updateQuantity, clearCart, totalAmount } = useCart()
@@ -38,7 +36,6 @@ export default function ShopPage() {
     const rawMain = Number(product.stock_main) || 0
     const rawExt = Number(product.stock_external) || 0
 
-    // Erst Hauptlager, dann Außenlager abziehen
     const deductMain = Math.min(rawMain, qtyInCart)
     const remQty = qtyInCart - deductMain
     const deductExt = Math.min(rawExt, remQty)
@@ -50,7 +47,6 @@ export default function ShopPage() {
     return { stockMain, stockExt, total }
   }
 
-  // Funktion zum Laden/Aktualisieren der Produktdaten aus Supabase
   const fetchProducts = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (user?.email) {
@@ -94,33 +90,30 @@ export default function ShopPage() {
     fetchProducts()
   }, [])
 
-  // 1. Nur Produkte berücksichtigen, die in mindestens einem Lager Bestand haben (> 0)
-  const availableProducts = products.filter(
-    (p) => (p.stock_main || 0) + (p.stock_external || 0) > 0
-  )
-
-  // 2. Verfügbare Produkte nach SKU gruppieren
-// Helper: Stamm-SKU ohne Längen-Suffix extrahieren (z.B. A19-PR-FC-BE statt A19-PR-FC-BE-115)
+  // Helper: Gruppiert Varianten nach Modell (Marke + Titel) statt Einzel-SKU
   const getParentGroupKey = (product: any) => {
     if (product.title && product.brand) {
-      // Gruppiert sicher alle Längen des gleichen Modells zusammen
       return `${product.brand.trim().toUpperCase()}_${product.title.trim().toLowerCase()}`
     }
-    // Fallback: Schneidet Bindestrich-Suffixe ab (z.B. -115)
     return product.sku ? product.sku.replace(/-\d+$/, '') : product.id
   }
 
-  // 1. Produkte nach Modell (Stamm-SKU / Titel) gruppieren
-  const groupedProducts = products.reduce((acc: { [key: string]: any[] }, product) => {
+  // 1. Nur Produkte mit tatsächlichem Restbestand (> 0) berücksichtigen
+  const availableProducts = products.filter(
+    (p) => getEffectiveStock(p).total > 0
+  )
+
+  // 2. Verfügbare Produkte nach Modell gruppieren
+  const groupedProducts = availableProducts.reduce((acc: { [key: string]: any[] }, product) => {
     const key = getParentGroupKey(product)
     if (!acc[key]) acc[key] = []
     acc[key].push(product)
     return acc
   }, {})
 
-  const brands = Array.from(new Set(products.map((p) => p.brand).filter(Boolean)))
+  const brands = Array.from(new Set(availableProducts.map((p) => p.brand).filter(Boolean)))
 
-  // 2. Gruppierte Modelle nach Suchbegriff und Marke filtern
+  // 3. Gruppierte Modelle nach Suchbegriff und Marke filtern
   const groupedKeys = Object.keys(groupedProducts).filter((groupKey) => {
     const group = groupedProducts[groupKey]
     const mainItem = group[0]
@@ -134,19 +127,16 @@ export default function ShopPage() {
     return matchesSearch && matchesBrand
   })
 
-
-// Wenn der Kunde auf "+ Hinzufügen" klickt, wird die eingestellte Menge übertragen
-  const handleAddToCart = (sku: string) => {
-    const group = groupedProducts[sku]
+  const handleAddToCart = (groupKey: string) => {
+    const group = groupedProducts[groupKey]
     if (!group) return
 
-    const selectedLength = selectedLengths[sku]
-    const quantityToAdd = selectedQuantities[sku] || 1
+    const selectedLength = selectedLengths[groupKey]
+    const quantityToAdd = selectedQuantities[groupKey] || 1
     
     const productVariant = group.find(p => p.length === selectedLength) || group[0]
     
     if (productVariant) {
-      // Berechne den effektiven Restbestand dieser Variante (Bestand minus was schon im Warenkorb liegt)
       const { total: effectiveTotal } = getEffectiveStock(productVariant)
 
       if (effectiveTotal <= 0) {
@@ -154,11 +144,10 @@ export default function ShopPage() {
         return
       }
 
-      // Falls die gewünschte Menge größer ist als der verfügbare Restbestand, auf den Restbestand deckeln
       const safeQuantity = Math.min(quantityToAdd, effectiveTotal)
 
       if (quantityToAdd > effectiveTotal) {
-        alert(`Es sind nur noch ${effectiveTotal} Stück verfügbar. Die Menge wurde auf ${effectiveTotal} angepasst.`)
+        alert(`Es sind nur noch ${effectiveTotal} Stück verfügbar. Die Menge wurde angepasst.`)
       }
 
       const ekPrice = (Number(productVariant.price_ek) > 0) 
@@ -171,9 +160,7 @@ export default function ShopPage() {
       }
 
       addToCart(itemForCart, safeQuantity)
-
-      // Mengeneingabefeld nach dem Hinzufügen wieder auf 1 zurücksetzen
-      setSelectedQuantities(prev => ({ ...prev, [sku]: 1 }))
+      setSelectedQuantities(prev => ({ ...prev, [groupKey]: 1 }))
     }
   }
 
@@ -190,7 +177,7 @@ export default function ShopPage() {
           items: cart,
           totalAmount,
           userEmail,
-          note: orderNote, // Kommentar an die API übermitteln
+          note: orderNote,
         }),
       })
 
@@ -201,7 +188,7 @@ export default function ShopPage() {
       }
 
       clearCart()
-      setOrderNote('') // Kommentar zurücksetzen
+      setOrderNote('')
       setOrderSuccess(true)
 
       await fetchProducts()
@@ -284,22 +271,27 @@ export default function ShopPage() {
         {loading ? (
           <p className="text-center py-12 text-gray-500">...</p>
         ) : groupedKeys.length === 0 ? (
-          <p className="text-center py-12 text-gray-500">Keine Artikel gefunden.</p>
+          <p className="text-center py-12 text-gray-500">Keine verfügbaren Artikel gefunden.</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {groupedKeys.map((sku) => {
-              const group = groupedProducts[sku]
+            {groupedKeys.map((groupKey) => {
+              const group = groupedProducts[groupKey]
               const mainItem = group[0]
               
+              // Nur Längen auflisten, deren Restbestand > 0 ist
               const availableLengths = group
+                .filter(p => getEffectiveStock(p).total > 0)
                 .map(p => p.length)
                 .filter((v, i, a) => v && a.indexOf(v) === i)
 
-              const currentLength = selectedLengths[sku] || availableLengths[0]
-              const activeVariant = group.find(p => p.length === currentLength) || mainItem
+              if (availableLengths.length === 0) return null
+
+              const currentLength = selectedLengths[groupKey] || availableLengths[0]
+              const activeVariant = group.find(p => p.length === currentLength) || group[0]
+              const effectiveStock = getEffectiveStock(activeVariant)
 
               return (
-                <div key={sku} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col justify-between hover:shadow-md transition">
+                <div key={groupKey} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col justify-between hover:shadow-md transition">
                   {/* Produktbild */}
                   <div className="h-48 bg-gray-100 flex items-center justify-center overflow-hidden border-b border-gray-100 relative">
                     {mainItem.image_url ? (
@@ -320,13 +312,11 @@ export default function ShopPage() {
                     <div>
                       <div className="flex justify-between items-start mb-1">
                         <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">{mainItem.brand}</span>
-                          <span className="text-xs text-gray-400">
-                            SKU: {activeVariant.sku}
-                          </span>
+                        <span className="text-xs text-gray-400">SKU: {activeVariant.sku}</span>
                       </div>
                       <h3 className="font-bold text-gray-800 text-lg mb-2">{mainItem.title}</h3>
                       
-                      {/* Längenauswahl Dropdown */}
+                      {/* Längenauswahl Dropdown (Nur lieferbare Längen) */}
                       {availableLengths.length > 0 && (
                         <div className="mb-4">
                           <label className="block text-xs font-semibold text-gray-600 mb-1">
@@ -334,18 +324,17 @@ export default function ShopPage() {
                           </label>
                           <select
                             value={currentLength}
-                            onChange={(e) => setSelectedLengths({ ...selectedLengths, [sku]: e.target.value })}
+                            onChange={(e) => setSelectedLengths({ ...selectedLengths, [groupKey]: e.target.value })}
                             className="w-full p-2 border border-gray-300 rounded text-sm bg-gray-50 focus:bg-white font-medium"
                           >
                             {availableLengths.map((len) => {
                               const variant = group.find(p => p.length === len)
                               if (!variant) return null
-
-                              const { total: effectiveTotal } = getEffectiveStock(variant)
+                              const { total: stock } = getEffectiveStock(variant)
 
                               return (
                                 <option key={len} value={len}>
-                                  {len} {effectiveTotal > 0 ? `(${t('shop.stock')}: ${effectiveTotal})` : `(${t('shop.out_of_stock')})`}
+                                  {len} ({t('shop.stock')}: {stock})
                                 </option>
                               )
                             })}
@@ -354,31 +343,17 @@ export default function ShopPage() {
                       )}
                     </div>
 
-                    {/* Detaillierter, reaktiver Lieferzeit-Status */}
+                    {/* Detaillierter Lieferzeit-Status */}
                     <div className="mb-4 text-xs">
-                      {(() => {
-                        const { stockMain, stockExt } = getEffectiveStock(activeVariant)
-
-                        if (stockMain > 0) {
-                          return (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-medium">
-                              <span>🟢</span> {t('shop.warehouse_main')} ({stockMain} Stk.)
-                            </span>
-                          )
-                        } else if (stockExt > 0) {
-                          return (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200 font-medium">
-                              <span>🟠</span> {t('shop.warehouse_external')} ({stockExt} Stk.)
-                            </span>
-                          )
-                        } else {
-                          return (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-50 text-red-800 border border-red-200 font-medium">
-                              <span>🔴</span> {t('shop.out_of_stock')}
-                            </span>
-                          )
-                        }
-                      })()}
+                      {effectiveStock.stockMain > 0 ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-medium">
+                          <span>🟢</span> {t('shop.warehouse_main')} ({effectiveStock.stockMain} Stk.)
+                        </span>
+                      ) : effectiveStock.stockExt > 0 ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200 font-medium">
+                          <span>🟠</span> {t('shop.warehouse_external')} ({effectiveStock.stockExt} Stk.)
+                        </span>
+                      ) : null}
                     </div>
 
                     <div className="border-t pt-4 flex justify-between items-end mt-2">
@@ -401,24 +376,21 @@ export default function ShopPage() {
                         <input
                           type="number"
                           min="1"
-                          max={getEffectiveStock(activeVariant).total}
-                          value={selectedQuantities[sku] || 1}
+                          max={effectiveStock.total}
+                          value={selectedQuantities[groupKey] || 1}
                           onChange={(e) => {
-                            const effectiveTotal = getEffectiveStock(activeVariant).total
                             const val = parseInt(e.target.value) || 1
-                            // Verhindert die Eingabe von Werten > Restbestand oder < 1
-                            const clampedVal = Math.min(Math.max(1, val), Math.max(1, effectiveTotal))
+                            const clampedVal = Math.min(Math.max(1, val), Math.max(1, effectiveStock.total))
                             
                             setSelectedQuantities({
                               ...selectedQuantities,
-                              [sku]: clampedVal,
+                              [groupKey]: clampedVal,
                             })
                           }}
-                          disabled={getEffectiveStock(activeVariant).total <= 0}
-                          className="w-14 p-1.5 border border-gray-300 rounded text-center text-sm font-semibold bg-gray-50 focus:bg-white disabled:opacity-50"
+                          className="w-14 p-1.5 border border-gray-300 rounded text-center text-sm font-semibold bg-gray-50 focus:bg-white"
                         />
                         <button
-                          onClick={() => handleAddToCart(sku)}
+                          onClick={() => handleAddToCart(groupKey)}
                           className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded text-sm font-medium transition"
                         >
                           {t('shop.add_to_cart')}
@@ -434,7 +406,7 @@ export default function ShopPage() {
         )}
       </main>
 
-{/* Warenkorb Sidebar */}
+      {/* Warenkorb Sidebar */}
       {isCartOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-end">
           <div className="bg-white w-full max-w-md h-full flex flex-col p-6 shadow-xl">
@@ -478,7 +450,6 @@ export default function ShopPage() {
                               SKU: {item.sku} {item.length && `| ${item.length}`}
                             </div>
 
-                            {/* Dynamischer, übersetzter Lager-Status */}
                             <div className="text-[11px] font-medium mt-0.5">
                               {mainQty > 0 && extQty > 0 ? (
                                 <span className="text-blue-600 font-semibold">
@@ -497,14 +468,12 @@ export default function ShopPage() {
                               )}
                             </div>
 
-                            {/* Einzelpreis & Positionssumme */}
                             <div className="text-xs text-blue-600 font-bold mt-0.5">
                               {itemEkPrice.toFixed(2)} € <span className="text-gray-400 font-normal">{t('shop.cart_unit_price')}</span>
                               <span className="text-gray-700 font-bold ml-2">({t('shop.cart_subtotal')} {itemSubtotal.toFixed(2)} €)</span>
                             </div>
                           </div>
 
-                          {/* Mengenänderung & Löschen */}
                           <div className="flex items-center gap-2">
                             <input
                               type="number"
@@ -532,7 +501,6 @@ export default function ShopPage() {
 
                 {cart.length > 0 && (
                   <div className="border-t pt-4 mt-4 space-y-4">
-                    {/* Anmerkungen / Kommentarfeld */}
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">
                         {t('shop.cart_note_label')}
