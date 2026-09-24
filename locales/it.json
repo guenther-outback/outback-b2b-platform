@@ -36,6 +36,7 @@
     "cart_stock_split_main": "🟢 {qty}x Magazzino Principale",
     "cart_stock_split_ext": "🟠 {qty}x Magazzino Esterno",
     "cart_unit_price": "/ pz.",
-    "cart_subtotal": "Totale:"
+    "cart_subtotal": "Totale:",
+    "select_color": "Seleziona colore:"
   }
 }

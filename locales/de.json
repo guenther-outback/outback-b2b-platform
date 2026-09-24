@@ -36,6 +36,7 @@
     "cart_stock_split_main": "🟢 {qty}x Hauptlager",
     "cart_stock_split_ext": "🟠 {qty}x Ext. Lager",
     "cart_unit_price": "/ Stk.",
-    "cart_subtotal": "Gesamt:"    
+    "cart_subtotal": "Gesamt:",
+    "select_color": "Farbe wählen:"   
   }
 }

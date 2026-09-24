@@ -156,7 +156,7 @@ export async function POST(request: Request) {
     // 5. Invio e-mail tramite Resend utilizzando il dominio verificato
     await resend.emails.send({
       from: 'Outback B2B <info@b2b.outback.it>',
-      to: ['guenther@outback.it'],
+      to: ['info@outback.it'],
       replyTo: userEmail,
       subject: `[Ordine B2B] ${customer?.company_name || userEmail}`,
       html: emailHtml,

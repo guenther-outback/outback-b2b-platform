@@ -298,15 +298,15 @@ export default function ShopPage() {
                 <div key={groupKey} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col justify-between hover:shadow-md transition">
                   {/* Produktbild */}
                   <div className="h-48 bg-gray-100 flex items-center justify-center overflow-hidden border-b border-gray-100 relative">
-                    {activeVariant.image_url || mainItem.image_url ? (
+                    {activeVariant.image_url ? (
                       <img
-                        src={activeVariant.image_url || mainItem.image_url}
-                        alt={mainItem.title}
+                        src={activeVariant.image_url}
+                        alt={`${mainItem.title} ${currentColor}`}
                         className="w-full h-full object-contain p-4"
                       />
                     ) : (
                       <div className="text-gray-400 text-xs flex flex-col items-center gap-1">
-                        <span>📷 Kein Bild vorhanden</span>
+                        <span>📷 Kein Bild für diese Farbe</span>
                       </div>
                     )}
                   </div>
@@ -326,7 +326,7 @@ export default function ShopPage() {
                         {availableColors.length > 0 && (
                           <div>
                             <label className="block text-xs font-semibold text-gray-600 mb-1">
-                              Farbe / Colore:
+                              {t('shop.select_color') || 'Farbe wählen:'}
                             </label>
                             <select
                               value={currentColor}

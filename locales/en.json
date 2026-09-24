@@ -36,6 +36,7 @@
     "cart_stock_split_main": "🟢 {qty}x Main Warehouse",
     "cart_stock_split_ext": "🟠 {qty}x External Warehouse",
     "cart_unit_price": "/ pcs.",
-    "cart_subtotal": "Total:"
+    "cart_subtotal": "Total:",
+    "select_color": "Select color:"
   }
 }
