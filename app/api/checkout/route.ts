@@ -77,22 +77,41 @@ export async function POST(request: Request) {
       await supabaseAdmin.from('order_items').insert(orderItems)
     }
 
-    // 4. HTML-Tabelle für die E-Mail generieren (mit EK-Preis)
+// 4. HTML-Tabelle für die E-Mail generieren (mit Mengensplit für Haupt- & Außenlager)
     const itemsHtml = items.map((item: any) => {
       const itemEkPrice = item.price_ek || item.price_vk || 0
-      const isMainWarehouse = (Number(item.stock_main) || 0) > 0
+      const qty = Number(item.quantity) || 1
+      const stockMain = Number(item.stock_main) || 0
+
+      // Exakte Verteilung auf die Lager berechnen
+      const mainQty = Math.min(stockMain, qty)
+      const extQty = Math.max(0, qty - mainQty)
+
+      let warehouseText = ''
+      let warehouseColor = '#059669' // Grün für Hauptlager
+
+      if (extQty === 0) {
+        warehouseText = 'Lager: Hauptlager'
+      } else if (mainQty === 0) {
+        warehouseText = 'Lager: Externes Händlerlager'
+        warehouseColor = '#d97706' // Orange für Außenlager
+      } else {
+        warehouseText = `Lager: ${mainQty}x Hauptlager / ${extQty}x Externes Händlerlager`
+        warehouseColor = '#2563eb' // Blau für Mischbestand
+      }
+
       return `
         <tr>
-            <td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.sku}</td>
-            <td style="padding: 8px; border-bottom: 1px solid #ddd;">
-                <strong>${item.brand}</strong> - ${item.title} ${item.length ? `(${item.length})` : ''}<br/>
-                <small style="color: ${isMainWarehouse ? '#059669' : '#d97706'};">
-                Lager: ${isMainWarehouse ? 'Hauptlager' : 'Externes Händlerlager'}
-                </small>
-            </td>
-            <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">${item.quantity}</td>
-            <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${itemEkPrice.toFixed(2)} €</td>
-            <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${(itemEkPrice * item.quantity).toFixed(2)} €</td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.sku}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;">
+            <strong>${item.brand}</strong> - ${item.title} ${item.length ? `(${item.length})` : ''}<br/>
+            <small style="color: ${warehouseColor}; font-weight: bold;">
+              ${warehouseText}
+            </small>
+          </td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">${qty}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${itemEkPrice.toFixed(2)} €</td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${(itemEkPrice * qty).toFixed(2)} €</td>
         </tr>
       `
     }).join('')
