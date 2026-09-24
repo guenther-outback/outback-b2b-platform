@@ -14,10 +14,10 @@ export async function POST(request: Request) {
     const { items, totalAmount, userEmail, note } = await request.json()
 
     if (!items || items.length === 0 || !userEmail) {
-      return NextResponse.json({ error: 'Ungültige Bestelldaten' }, { status: 400 })
+      return NextResponse.json({ error: 'Dati ordine non validi' }, { status: 400 })
     }
 
-    // 1. Lagerbestand atomar via RPC reduzieren (stock_main & stock_external)
+    // 1. Riduzione atomica dello stock in Supabase via RPC (stock_main & stock_external)
     const stockItems = items.map((item: any) => ({
       id: item.id,
       quantity: Number(item.quantity) || 1,
@@ -28,14 +28,14 @@ export async function POST(request: Request) {
     })
 
     if (stockError) {
-      console.error('Bestandsaktualisierung fehlgeschlagen:', stockError)
+      console.error('Aggiornamento magazzino fallito:', stockError)
       return NextResponse.json(
-        { error: `Bestandsaktualisierung fehlgeschlagen: ${stockError.message}` },
+        { error: `Aggiornamento magazzino fallito: ${stockError.message}` },
         { status: 500 }
       )
     }
 
-    // 2. Kundendaten aus Supabase laden
+    // 2. Caricamento dati cliente da Supabase
     const { data: customer } = await supabaseAdmin
       .from('customers')
       .select('*')
@@ -43,13 +43,13 @@ export async function POST(request: Request) {
       .single()
 
     const customerInfo = customer ? `
-      <strong>Firma:</strong> ${customer.company_name}<br/>
-      <strong>Ansprechpartner:</strong> ${customer.contact_name}<br/>
-      <strong>Adresse:</strong> ${customer.address}, ${customer.zip_code} ${customer.city}<br/>
-      <strong>E-Mail:</strong> ${customer.email}
-    ` : `<strong>E-Mail:</strong> ${userEmail}`
+      <strong>Azienda:</strong> ${customer.company_name}<br/>
+      <strong>Referente:</strong> ${customer.contact_name}<br/>
+      <strong>Indirizzo:</strong> ${customer.address}, ${customer.zip_code} ${customer.city}<br/>
+      <strong>E-mail:</strong> ${customer.email}
+    ` : `<strong>E-mail:</strong> ${userEmail}`
 
-    // 3. Bestellung in Supabase speichern
+    // 3. Salvataggio dell'ordine nella tabella 'orders'
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
       .insert({
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       .select()
       .single()
 
-    if (orderError) console.error('Fehler beim Speichern der Order:', orderError)
+    if (orderError) console.error('Errore durante il salvataggio dell\'ordine:', orderError)
 
     if (order) {
       const orderItems = items.map((item: any) => {
@@ -77,65 +77,65 @@ export async function POST(request: Request) {
       await supabaseAdmin.from('order_items').insert(orderItems)
     }
 
-// 4. HTML-Tabelle für die E-Mail generieren (mit Mengensplit für Haupt- & Außenlager)
+    // 4. Generazione della tabella HTML per l'email in italiano (con ripartizione dei magazzini)
     const itemsHtml = items.map((item: any) => {
       const itemEkPrice = item.price_ek || item.price_vk || 0
       const qty = Number(item.quantity) || 1
       const stockMain = Number(item.stock_main) || 0
 
-      // Exakte Verteilung auf die Lager berechnen
+      // Calcolo esatto della ripartizione tra magazzino principale ed esterno
       const mainQty = Math.min(stockMain, qty)
       const extQty = Math.max(0, qty - mainQty)
 
       let warehouseText = ''
-      let warehouseColor = '#059669' // Grün für Hauptlager
+      let warehouseColor = '#059669' // Verde per magazzino principale
 
       if (extQty === 0) {
-        warehouseText = 'Lager: Hauptlager'
+        warehouseText = 'Magazzino: Magazzino Principale'
       } else if (mainQty === 0) {
-        warehouseText = 'Lager: Externes Händlerlager'
-        warehouseColor = '#d97706' // Orange für Außenlager
+        warehouseText = 'Magazzino: Magazzino Esterno'
+        warehouseColor = '#d97706' // Arancione per magazzino esterno
       } else {
-        warehouseText = `Lager: ${mainQty}x Hauptlager / ${extQty}x Externes Händlerlager`
-        warehouseColor = '#2563eb' // Blau für Mischbestand
+        warehouseText = `Magazzino: ${mainQty}x Principale / ${extQty}x Esterno`
+        warehouseColor = '#2563eb' // Blu per magazzino misto
       }
 
       return `
         <tr>
-          <td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.sku}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #ddd;">
+          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-family: monospace;">${item.sku}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">
             <strong>${item.brand}</strong> - ${item.title} ${item.length ? `(${item.length})` : ''}<br/>
             <small style="color: ${warehouseColor}; font-weight: bold;">
               ${warehouseText}
             </small>
           </td>
-          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">${qty}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${itemEkPrice.toFixed(2)} €</td>
-          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${(itemEkPrice * qty).toFixed(2)} €</td>
+          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: center;">${qty}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">${itemEkPrice.toFixed(2)} €</td>
+          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">${(itemEkPrice * qty).toFixed(2)} €</td>
         </tr>
       `
     }).join('')
 
     const emailHtml = `
-      <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; color: #333;">
-        <h2 style="color: #1a365d; border-bottom: 2px solid #1a365d; padding-bottom: 8px;">Neue B2B Bestellung eingegangen</h2>
+      <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; color: #2d3748; line-height: 1.5;">
+        <h2 style="color: #1a365d; border-bottom: 2px solid #1a365d; padding-bottom: 8px;">Nuovo Ordine B2B Ricevuto</h2>
         
-        <h3>Kundeninformationen:</h3>
-        <p style="background: #f7fafc; padding: 12px; border-radius: 6px;">
+        <h3 style="color: #2b6cb0; margin-top: 20px;">Informazioni Cliente:</h3>
+        <p style="background: #f7fafc; padding: 14px; border-radius: 6px; border: 1px solid #e2e8f0;">
           ${customerInfo}
         </p>
 
-        ${note ? `<p><strong>Anmerkung des Kunden:</strong><br/>${note}</p>` : ''}
+        ${note ? `<p style="background: #fffaf0; padding: 12px; border-radius: 6px; border: 1px solid #feebc8;"><strong>Nota del cliente:</strong><br/>${note}</p>` : ''}
 
-        <h3>Bestellte Artikel:</h3>
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+        <h3 style="color: #2b6cb0; margin-top: 25px;">Articoli Ordinati:</h3>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px;">
           <thead>
-            <tr style="background-color: #edf2f7; text-align: left;">
-              <th style="padding: 8px;">SKU</th>
-              <th style="padding: 8px;">Artikel</th>
-              <th style="padding: 8px; text-align: center;">Menge</th>
-              <th style="padding: 8px; text-align: right;">EP (Netto EK)</th>
-              <th style="padding: 8px; text-align: right;">Gesamt</th>
+            <tr style="background-color: #edf2f7; text-align: left; color: #4a5568;">
+              <th style="padding: 10px;">SKU</th>
+              <th style="padding: 10px;">Articolo</th>
+              <th style="padding: 10px; text-align: center;">Quantità</th>
+              <th style="padding: 10px; text-align: right;">Prezzo Unitario (Netto)</th>
+              <th style="padding: 10px; text-align: right;">Totale</th>
             </tr>
           </thead>
           <tbody>
@@ -143,23 +143,27 @@ export async function POST(request: Request) {
           </tbody>
         </table>
 
-        <div style="text-align: right; font-size: 18px; margin-top: 20px;">
-          <strong>Gesamtsumme (Netto EK): ${totalAmount.toFixed(2)} €</strong>
+        <div style="text-align: right; font-size: 18px; margin-top: 20px; padding-top: 10px; border-top: 2px solid #e2e8f0;">
+          <strong>Importo Totale (Netto): ${totalAmount.toFixed(2)} €</strong>
         </div>
+
+        <p style="font-size: 12px; color: #a0aec0; margin-top: 40px; text-align: center;">
+          Questa è una notifica automatica dal Portale B2B Outback.
+        </p>
       </div>
     `
 
-    // 5. E-Mail via Resend schicken
+    // 5. Invio e-mail tramite Resend utilizzando il dominio verificato
     await resend.emails.send({
-      from: 'Outback B2B <noreply@b2b.outback.it>',
-      to: ['guenther@outback.it'], //später info@outback.it
+      from: 'Outback B2B <info@b2b.outback.it>',
+      to: ['guenther@outback.it'],
       replyTo: userEmail,
-      subject: `[B2B Bestellung] ${customer?.company_name || userEmail}`,
+      subject: `[Ordine B2B] ${customer?.company_name || userEmail}`,
       html: emailHtml,
     })
 
     return NextResponse.json({ success: true })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Fehler beim Checkout' }, { status: 500 })
+    return NextResponse.json({ error: err.message || 'Errore durante il checkout' }, { status: 500 })
   }
 }

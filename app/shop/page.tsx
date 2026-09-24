@@ -14,8 +14,9 @@ export default function ShopPage() {
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [userEmail, setUserEmail] = useState('')
   const [orderSubmitting, setOrderSubmitting] = useState(false)
-  const [isAdmin, setIsAdmin] = useState(false) // <-- NEU: State für Admin-Status
+  const [isAdmin, setIsAdmin] = useState(false)
   const [orderSuccess, setOrderSuccess] = useState(false)
+  const [orderNote, setOrderNote] = useState('') // State für den Bestellkommentar
 
   const { t } = useLanguage()
   
@@ -50,12 +51,11 @@ export default function ShopPage() {
   }
 
   // Funktion zum Laden/Aktualisieren der Produktdaten aus Supabase
-const fetchProducts = async () => {
+  const fetchProducts = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (user?.email) {
       setUserEmail(user.email)
       
-      // NEU: Admin-Status aus der Kunden-Tabelle abfragen
       const { data: customer } = await supabase
         .from('customers')
         .select('is_admin')
@@ -68,13 +68,11 @@ const fetchProducts = async () => {
     const { data, error } = await supabase
       .from('products')
       .select('*')
-      .order('sku', { ascending: true }) 
       .order('sku', { ascending: true })
 
     if (!error && data) {
       setProducts(data)
       
-      // Initial für jede SKU die erste verfügbare Länge & Standardmenge = 1 setzen
       const initialLengths: { [sku: string]: string } = {}
       const initialQuantities: { [sku: string]: number } = {}
 
@@ -124,7 +122,8 @@ const fetchProducts = async () => {
     return matchesSearch && matchesBrand
   })
 
-  // Wenn der Kunde auf "+ Hinzufügen" klickt, wird die eingestellte Menge übertragen
+
+// Wenn der Kunde auf "+ Hinzufügen" klickt, wird die eingestellte Menge übertragen
   const handleAddToCart = (sku: string) => {
     const group = groupedProducts[sku]
     if (!group) return
@@ -135,7 +134,21 @@ const fetchProducts = async () => {
     const productVariant = group.find(p => p.length === selectedLength) || group[0]
     
     if (productVariant) {
-      // B2B-Einkaufspreis ermitteln (Fallback auf price_vk, falls price_ek nicht definiert oder 0 ist)
+      // Berechne den effektiven Restbestand dieser Variante (Bestand minus was schon im Warenkorb liegt)
+      const { total: effectiveTotal } = getEffectiveStock(productVariant)
+
+      if (effectiveTotal <= 0) {
+        alert('Dieser Artikel ist leider ausverkauft.')
+        return
+      }
+
+      // Falls die gewünschte Menge größer ist als der verfügbare Restbestand, auf den Restbestand deckeln
+      const safeQuantity = Math.min(quantityToAdd, effectiveTotal)
+
+      if (quantityToAdd > effectiveTotal) {
+        alert(`Es sind nur noch ${effectiveTotal} Stück verfügbar. Die Menge wurde auf ${effectiveTotal} angepasst.`)
+      }
+
       const ekPrice = (Number(productVariant.price_ek) > 0) 
         ? Number(productVariant.price_ek) 
         : Number(productVariant.price_vk)
@@ -145,47 +158,49 @@ const fetchProducts = async () => {
         price_ek: ekPrice
       }
 
-      addToCart(itemForCart, quantityToAdd)
+      addToCart(itemForCart, safeQuantity)
+
+      // Mengeneingabefeld nach dem Hinzufügen wieder auf 1 zurücksetzen
+      setSelectedQuantities(prev => ({ ...prev, [sku]: 1 }))
     }
   }
 
   const handleCheckout = async () => {
-      if (cart.length === 0 || orderSubmitting) return
+    if (cart.length === 0 || orderSubmitting) return
 
-      setOrderSubmitting(true)
+    setOrderSubmitting(true)
 
-      try {
-        // API Route aufrufen (macht Bestand + Order-Save + Mail)
-        const response = await fetch('/api/checkout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            items: cart,
-            totalAmount,
-            userEmail,
-          }),
-        })
+    try {
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: cart,
+          totalAmount,
+          userEmail,
+          note: orderNote, // Kommentar an die API übermitteln
+        }),
+      })
 
-        const result = await response.json()
+      const result = await response.json()
 
-        if (!response.ok) {
-          throw new Error(result.error || 'Fehler beim Verarbeiten der Bestellung')
-        }
-
-        // Warenkorb leeren & Erfolgsmeldung anzeigen
-        clearCart()
-        setOrderSuccess(true)
-
-        // Produkte neu laden, um die aktualisierten Bestände in der UI zu haben
-        await fetchProducts()
-
-      } catch (error: any) {
-        console.error('Checkout Fehler:', error)
-        alert(`Bestellung konnte nicht verarbeitet werden: ${error.message}`)
-      } finally {
-        setOrderSubmitting(false)
+      if (!response.ok) {
+        throw new Error(result.error || 'Fehler beim Verarbeiten der Bestellung')
       }
+
+      clearCart()
+      setOrderNote('') // Kommentar zurücksetzen
+      setOrderSuccess(true)
+
+      await fetchProducts()
+
+    } catch (error: any) {
+      console.error('Checkout Fehler:', error)
+      alert(`Bestellung konnte nicht verarbeitet werden: ${error.message}`)
+    } finally {
+      setOrderSubmitting(false)
     }
+  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -205,7 +220,6 @@ const fetchProducts = async () => {
           <div className="flex items-center gap-4">
             <LanguageSwitcher />
             
-            {/* NEU: Admin-Link (nur sichtbar, wenn isAdmin true ist) */}
             {isAdmin && (
               <a href="/admin" className="text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md transition flex items-center gap-1">
                 ⚙️ Admin
@@ -313,7 +327,6 @@ const fetchProducts = async () => {
                               const variant = group.find(p => p.length === len)
                               if (!variant) return null
 
-                              // Virtuellen Restbestand berechnen
                               const { total: effectiveTotal } = getEffectiveStock(variant)
 
                               return (
@@ -355,16 +368,13 @@ const fetchProducts = async () => {
                     </div>
 
                     <div className="border-t pt-4 flex justify-between items-end mt-2">
-                      {/* B2B EK-Preis groß & Prominent, UVP/VK klein darüber/darunter */}
                       <div>
-                        {/* Unverbindlicher Verkaufspreis (UVP / VK) - klein, ohne Durchstreichung */}
                         {activeVariant.price_vk > 0 && (
                           <div className="text-[11px] font-medium text-gray-500">
                             {t('shop.price_uvp') || 'UVP'}: {activeVariant.price_vk.toFixed(2)} €
                           </div>
                         )}
 
-                        {/* B2B Einkaufspreis (EK) - groß & hervorgehoben */}
                         <div className="text-xs font-bold text-blue-600 uppercase tracking-wide mt-0.5">
                           {t('shop.price_b2b') || 'Ihr B2B Preis'}
                         </div>
@@ -373,19 +383,25 @@ const fetchProducts = async () => {
                         </div>
                       </div>
                       
-                      {/* Mengeneingabe & Add Button */}
                       <div className="flex items-center gap-2">
                         <input
                           type="number"
                           min="1"
+                          max={getEffectiveStock(activeVariant).total}
                           value={selectedQuantities[sku] || 1}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const effectiveTotal = getEffectiveStock(activeVariant).total
+                            const val = parseInt(e.target.value) || 1
+                            // Verhindert die Eingabe von Werten > Restbestand oder < 1
+                            const clampedVal = Math.min(Math.max(1, val), Math.max(1, effectiveTotal))
+                            
                             setSelectedQuantities({
                               ...selectedQuantities,
-                              [sku]: Math.max(1, parseInt(e.target.value) || 1),
+                              [sku]: clampedVal,
                             })
-                          }
-                          className="w-14 p-1.5 border border-gray-300 rounded text-center text-sm font-semibold bg-gray-50 focus:bg-white"
+                          }}
+                          disabled={getEffectiveStock(activeVariant).total <= 0}
+                          className="w-14 p-1.5 border border-gray-300 rounded text-center text-sm font-semibold bg-gray-50 focus:bg-white disabled:opacity-50"
                         />
                         <button
                           onClick={() => handleAddToCart(sku)}
@@ -435,7 +451,6 @@ const fetchProducts = async () => {
                       const itemEkPrice = item.price_ek || item.price_vk || 0
                       const itemSubtotal = itemEkPrice * item.quantity
 
-                      // Verteilung berechnen
                       const qty = Number(item.quantity) || 1
                       const stockMain = Number(item.stock_main) || 0
                       const mainQty = Math.min(stockMain, qty)
@@ -449,7 +464,7 @@ const fetchProducts = async () => {
                               SKU: {item.sku} {item.length && `| ${item.length}`}
                             </div>
 
-                            {/* NEU: Transparente Lager-Aufteilung im Warenkorb */}
+                            {/* Transparentes Lager-Badge im Warenkorb */}
                             <div className="text-[11px] font-medium mt-0.5">
                               {mainQty > 0 && extQty > 0 ? (
                                 <span className="text-blue-600 font-semibold">
@@ -466,15 +481,32 @@ const fetchProducts = async () => {
                               )}
                             </div>
 
-                            {/* Einzel-EK-Preis & Positions-Gesamtsumme */}
+                            {/* Einzelpreis & Positionssumme */}
                             <div className="text-xs text-blue-600 font-bold mt-0.5">
                               {itemEkPrice.toFixed(2)} € <span className="text-gray-400 font-normal">/ Stk.</span>
                               <span className="text-gray-700 font-bold ml-2">(Gesamt: {itemSubtotal.toFixed(2)} €)</span>
                             </div>
                           </div>
 
+                          {/* Mengenänderung & Löschen */}
                           <div className="flex items-center gap-2">
-                            {/* ... Rest der Menge & Löschen-Buttons bleibt unverändert ... */}
+                            <input
+                              type="number"
+                              min="1"
+                              value={item.quantity || 1}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10)
+                                updateQuantity(item.id, isNaN(val) ? 1 : val)
+                              }}
+                              className="w-12 p-1 border text-center rounded text-sm font-semibold bg-gray-50 focus:bg-white"
+                            />
+                            <button 
+                              onClick={() => removeFromCart(item.id)} 
+                              className="text-red-500 text-xs hover:underline p-1"
+                              title="Artikel entfernen"
+                            >
+                              ✕
+                            </button>
                           </div>
                         </div>
                       )
@@ -484,6 +516,20 @@ const fetchProducts = async () => {
 
                 {cart.length > 0 && (
                   <div className="border-t pt-4 mt-4 space-y-4">
+                    {/* Anmerkungen / Kommentarfeld */}
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        💬 Anmerkung zur Bestellung (Optional):
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={orderNote}
+                        onChange={(e) => setOrderNote(e.target.value)}
+                        placeholder="Z.B. Lieferterminwunsch, Kommission..."
+                        className="w-full p-2 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+
                     <div className="flex justify-between text-lg font-bold">
                       <span>{t('shop.total')}:</span>
                       <span>{totalAmount.toFixed(2)} €</span>
