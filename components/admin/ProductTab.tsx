@@ -15,6 +15,9 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
   const [openGroupKey, setOpenGroupKey] = useState<string | null>(null)
   const [applyImageToSameColor, setApplyImageToSameColor] = useState(true)
 
+  // Such-State für das Admin-Dashboard
+  const [searchTerm, setSearchTerm] = useState('')
+
   const [productForm, setProductForm] = useState({
     sku: '', brand: '', category: 'Skis', title: '', length: '', color: '',
     price_ek: 0, price_vk: 0, stock_main: 0, stock_external: 0, image_url: '',
@@ -58,13 +61,12 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
     setUploadingImage(false)
   }
 
-  // Salva o aggiorna prodotto (con opzione di propagazione immagine a tutte le varianti dello stesso colore)
+  // Salva o aggiorna prodotto
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault()
     
     try {
       if (editingId) {
-        // 1. Aggiorna la singola variante selezionata
         const { error } = await supabase
           .from('products')
           .update(productForm)
@@ -72,7 +74,6 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
 
         if (error) throw error
 
-        // 2. Se l'opzione è attiva e c'è un colore, aggiorna l'immagine di TUTTE le varianti dello stesso modello e colore
         if (applyImageToSameColor && productForm.color && productForm.image_url) {
           await supabase
             .from('products')
@@ -84,12 +85,9 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
 
         alert('Variante aggiornata con successo!')
       } else {
-        // Creazione nuova variante
-        const { data: newProd, error } = await supabase
+        const { error } = await supabase
           .from('products')
           .insert([productForm])
-          .select()
-          .single()
 
         if (error) throw error
 
@@ -143,6 +141,21 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
       color: '', price_ek: 0, price_vk: 0, stock_main: 0, stock_external: 0, image_url: ''
     })
   }
+
+  // Filter-Logik für die Modell-Gruppen
+  const filteredGroupKeys = Object.keys(groupedProducts).filter(groupKey => {
+    if (!searchTerm.trim()) return true
+
+    const variants = groupedProducts[groupKey]
+    const term = searchTerm.toLowerCase()
+
+    return variants.some(v => 
+      (v.title && v.title.toLowerCase().includes(term)) ||
+      (v.brand && v.brand.toLowerCase().includes(term)) ||
+      (v.sku && v.sku.toLowerCase().includes(term)) ||
+      (v.color && v.color.toLowerCase().includes(term))
+    )
+  })
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -248,95 +261,123 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
         </form>
       </div>
 
-      {/* Akkordeon Liste */}
+      {/* Rechte Spalte: Suchleiste & Akkordeon Liste */}
       <div className="lg:col-span-2 space-y-4">
-        {Object.keys(groupedProducts).map(groupKey => {
-          const variants = groupedProducts[groupKey]
-          const main = variants[0]
-          const totalMainStock = variants.reduce((sum, v) => sum + (v.stock_main || 0), 0)
-          const totalExtStock = variants.reduce((sum, v) => sum + (v.stock_external || 0), 0)
-          const isOpen = openGroupKey === groupKey
+        
+        {/* Suchleiste im Backend */}
+        <div className="bg-white p-3 rounded-lg shadow-sm border flex items-center gap-3">
+          <span className="text-gray-400 pl-1">🔍</span>
+          <input
+            type="text"
+            placeholder="Cerca per titolo, marca, SKU o colore..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="w-full text-sm outline-none bg-transparent"
+          />
+          {searchTerm && (
+            <button 
+              onClick={() => setSearchTerm('')}
+              className="text-xs text-gray-400 hover:text-gray-600 font-bold pr-1"
+            >
+              ✕
+            </button>
+          )}
+        </div>
 
-          return (
-            <div key={groupKey} className="bg-white rounded-lg shadow-sm border overflow-hidden transition">
-              <button
-                onClick={() => toggleGroup(groupKey)}
-                className="w-full p-4 bg-slate-900 hover:bg-slate-800 text-white flex justify-between items-center text-left transition"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-lg">{isOpen ? '🔽' : '▶️'}</span>
-                  {main.image_url && (
-                    <img src={main.image_url} alt={main.title} className="w-10 h-10 object-contain rounded bg-white p-1" />
-                  )}
-                  <div>
-                    <span className="text-xs font-bold text-blue-400 uppercase tracking-wide">{main.brand}</span>
-                    <h3 className="font-bold text-base leading-tight">{main.title}</h3>
+        {/* Modell-Akkordeons */}
+        {filteredGroupKeys.length === 0 ? (
+          <div className="bg-white p-8 rounded-lg shadow-sm border text-center text-gray-500 text-sm">
+            Nessun modello trovato per "{searchTerm}".
+          </div>
+        ) : (
+          filteredGroupKeys.map(groupKey => {
+            const variants = groupedProducts[groupKey]
+            const main = variants[0]
+            const totalMainStock = variants.reduce((sum, v) => sum + (v.stock_main || 0), 0)
+            const totalExtStock = variants.reduce((sum, v) => sum + (v.stock_external || 0), 0)
+            const isOpen = openGroupKey === groupKey
+
+            return (
+              <div key={groupKey} className="bg-white rounded-lg shadow-sm border overflow-hidden transition">
+                <button
+                  onClick={() => toggleGroup(groupKey)}
+                  className="w-full p-4 bg-slate-900 hover:bg-slate-800 text-white flex justify-between items-center text-left transition"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">{isOpen ? '🔽' : '▶️'}</span>
+                    {main.image_url && (
+                      <img src={main.image_url} alt={main.title} className="w-10 h-10 object-contain rounded bg-white p-1" />
+                    )}
+                    <div>
+                      <span className="text-xs font-bold text-blue-400 uppercase tracking-wide">{main.brand}</span>
+                      <h3 className="font-bold text-base leading-tight">{main.title}</h3>
+                    </div>
                   </div>
-                </div>
 
-                <div className="text-right text-xs">
-                  <span className="bg-slate-800 px-2.5 py-1 rounded text-slate-300 font-medium border border-slate-700">
-                    {variants.length} Varianti | Totale: <strong className="text-emerald-400">{totalMainStock + totalExtStock} pz.</strong>
-                  </span>
-                </div>
-              </button>
+                  <div className="text-right text-xs">
+                    <span className="bg-slate-800 px-2.5 py-1 rounded text-slate-300 font-medium border border-slate-700">
+                      {variants.length} Varianti | Totale: <strong className="text-emerald-400">{totalMainStock + totalExtStock} pz.</strong>
+                    </span>
+                  </div>
+                </button>
 
-              {isOpen && (
-                <div className="overflow-x-auto border-t border-slate-700">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="bg-gray-100 border-b text-gray-600">
-                        <th className="p-2">Img</th>
-                        <th className="p-2">SKU</th>
-                        <th className="p-2">Colore</th>
-                        <th className="p-2">Lunghezza</th>
-                        <th className="p-2">Prezzo B2B</th>
-                        <th className="p-2 text-emerald-700">Mag. Princ.</th>
-                        <th className="p-2 text-amber-700">Mag. Est.</th>
-                        <th className="p-2 text-right">Azione</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {variants.map((v: any) => {
-                        const isOut = (v.stock_main || 0) + (v.stock_external || 0) === 0
+                {isOpen && (
+                  <div className="overflow-x-auto border-t border-slate-700">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="bg-gray-100 border-b text-gray-600">
+                          <th className="p-2">Img</th>
+                          <th className="p-2">SKU</th>
+                          <th className="p-2">Colore</th>
+                          <th className="p-2">Lunghezza</th>
+                          <th className="p-2">Prezzo B2B</th>
+                          <th className="p-2 text-emerald-700">Mag. Princ.</th>
+                          <th className="p-2 text-amber-700">Mag. Est.</th>
+                          <th className="p-2 text-right">Azione</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {variants.map((v: any) => {
+                          const isOut = (v.stock_main || 0) + (v.stock_external || 0) === 0
 
-                        return (
-                          <tr key={v.id} className={`border-b hover:bg-gray-50 ${editingId === v.id ? 'bg-amber-50' : ''} ${isOut ? 'bg-red-50/50' : ''}`}>
-                            <td className="p-2">
-                              {v.image_url ? (
-                                <img src={v.image_url} alt={v.title} className="w-7 h-7 object-contain rounded border bg-white" />
-                              ) : (
-                                <span className="text-[10px] text-gray-400">No img</span>
-                              )}
-                            </td>
-                            <td className="p-2 font-mono font-bold">{v.sku}</td>
-                            <td className="p-2 font-semibold">{v.color || '-'}</td>
-                            <td className="p-2">{v.length || '-'}</td>
-                            <td className="p-2 font-bold">{(v.price_vk || 0).toFixed(2)} €</td>
-                            <td className="p-2">
-                              <span className={`font-bold ${v.stock_main > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
-                                {v.stock_main || 0} pz.
-                              </span>
-                            </td>
-                            <td className="p-2">
-                              <span className={`font-bold ${v.stock_external > 0 ? 'text-amber-700' : 'text-gray-400'}`}>
-                                {v.stock_external || 0} pz.
-                              </span>
-                            </td>
-                            <td className="p-2 text-right space-x-2">
-                              <button onClick={() => handleEditClick(v, groupKey)} className="p-1 text-slate-600 hover:text-blue-600 text-sm" title="Modifica variante">✏️</button>
-                              <button onClick={() => handleDeleteProduct(v.id)} className="p-1 text-red-500 hover:text-red-700 text-sm" title="Elimina variante">✕</button>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )
-        })}
+                          return (
+                            <tr key={v.id} className={`border-b hover:bg-gray-50 ${editingId === v.id ? 'bg-amber-50' : ''} ${isOut ? 'bg-red-50/50' : ''}`}>
+                              <td className="p-2">
+                                {v.image_url ? (
+                                  <img src={v.image_url} alt={v.title} className="w-7 h-7 object-contain rounded border bg-white" />
+                                ) : (
+                                  <span className="text-[10px] text-gray-400">No img</span>
+                                )}
+                              </td>
+                              <td className="p-2 font-mono font-bold">{v.sku}</td>
+                              <td className="p-2 font-semibold">{v.color || '-'}</td>
+                              <td className="p-2">{v.length || '-'}</td>
+                              <td className="p-2 font-bold">{(v.price_vk || 0).toFixed(2)} €</td>
+                              <td className="p-2">
+                                <span className={`font-bold ${v.stock_main > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
+                                  {v.stock_main || 0} pz.
+                                </span>
+                              </td>
+                              <td className="p-2">
+                                <span className={`font-bold ${v.stock_external > 0 ? 'text-amber-700' : 'text-gray-400'}`}>
+                                  {v.stock_external || 0} pz.
+                                </span>
+                              </td>
+                              <td className="p-2 text-right space-x-2">
+                                <button onClick={() => handleEditClick(v, groupKey)} className="p-1 text-slate-600 hover:text-blue-600 text-sm" title="Modifica variante">✏️</button>
+                                <button onClick={() => handleDeleteProduct(v.id)} className="p-1 text-red-500 hover:text-red-700 text-sm" title="Elimina variante">✕</button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )
+          })
+        )}
       </div>
     </div>
   )
