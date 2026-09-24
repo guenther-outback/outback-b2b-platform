@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabaseClient'
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'products' | 'customers' | 'upload'>('products')
@@ -27,13 +27,20 @@ export default function AdminDashboard() {
     image_url: '',
   })
 
-  // State für Kunden
+  // State für Kunden (inkl. is_admin)
   const [newCustomer, setNewCustomer] = useState({
-    company_name: '', contact_name: '', email: '', address: '', zip_code: '', city: ''
+    company_name: '', 
+    contact_name: '', 
+    email: '', 
+    address: '', 
+    zip_code: '', 
+    city: '',
+    is_admin: false
   })
 
   const [uploadStatus, setUploadStatus] = useState('')
   const [isUploading, setIsUploading] = useState(false)
+  const [previewData, setPreviewData] = useState<any[]>([])
 
   const supabase = createClient()
 
@@ -47,6 +54,28 @@ export default function AdminDashboard() {
     if (prodData) setProducts(prodData)
     if (custData) setCustomers(custData)
     setLoading(false)
+  }
+
+  // Helper-Funktion zum Einlesen von CSV-Text im Browser (unterstützt Komma & Semikolon)
+  const parseCsvString = (text: string) => {
+    const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0)
+    if (lines.length < 2) return []
+    const separator = lines[0].includes(';') ? ';' : ','
+    const headers = lines[0].split(separator).map(h => h.trim().replace(/^["']|["']$/g, ''))
+    
+    const result: any[] = []
+    for (let i = 1; i < lines.length; i++) {
+      const currentline = lines[i].split(separator)
+      if (currentline.length < headers.length && currentline.join('').trim() === '') continue
+      const obj: any = {}
+      for (let j = 0; j < headers.length; j++) {
+        let val = currentline[j] ? currentline[j].trim() : ''
+        val = val.replace(/^["']|["']$/g, '')
+        obj[headers[j]] = val
+      }
+      result.push(obj)
+    }
+    return result
   }
 
   // BILD UPLOAD ZU SUPABASE STORAGE
@@ -86,19 +115,33 @@ export default function AdminDashboard() {
     e.preventDefault()
     
     if (editingId) {
-      const { error } = await supabase.from('products').update(productForm).eq('id', editingId)
-      if (error) alert('Fehler beim Aktualisieren: ' + error.message)
-      else alert('Produkt erfolgreich aktualisiert!')
+      // .select() anhängen, um die aktualisierte Zeile zurückzuerhalten
+      const { data, error } = await supabase
+        .from('products')
+        .update(productForm)
+        .eq('id', editingId)
+        .select()
+
+      if (error) {
+        alert('Fehler beim Aktualisieren: ' + error.message)
+      } else if (!data || data.length === 0) {
+        alert('Fehler: Die Datenbank hat die Änderung blockiert (RLS-Berechtigung prüfen).')
+      } else {
+        alert('Produkt erfolgreich aktualisiert!')
+        resetForm()
+        loadData()
+      }
     } else {
       const { error } = await supabase.from('products').insert([productForm])
-      if (error) alert('Fehler beim Erstellen: ' + error.message)
-      else alert('Produkt neu angelegt!')
+      if (error) {
+        alert('Fehler beim Erstellen: ' + error.message)
+      } else {
+        alert('Produkt neu angelegt!')
+        resetForm()
+        loadData()
+      }
     }
-
-    resetForm()
-    loadData()
   }
-
   const handleEditClick = (product: any) => {
     setEditingId(product.id)
     setProductForm({
@@ -140,61 +183,102 @@ export default function AdminDashboard() {
     }])
     if (!error) {
       alert('Kunde freigeschaltet!')
-      setNewCustomer({ company_name: '', contact_name: '', email: '', address: '', zip_code: '', city: '' })
+      setNewCustomer({ company_name: '', contact_name: '', email: '', address: '', zip_code: '', city: '', is_admin: false })
+      loadData()
+    } else {
+      alert('Fehler beim Registrieren: ' + error.message)
+    }
+  }
+
+  // Admin-Status eines Kunden direkt umschalten
+  const handleToggleAdmin = async (customer: any) => {
+    const newStatus = !customer.is_admin
+    const { error } = await supabase
+      .from('customers')
+      .update({ is_admin: newStatus })
+      .eq('id', customer.id)
+
+    if (error) {
+      alert('Fehler beim Ändern der Rolle: ' + error.message)
+    } else {
       loadData()
     }
   }
 
-  // Excel Bulk Upload
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Excel Bulk Upload (Direkt ohne Vorschau)
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
     setIsUploading(true)
     setUploadStatus('Lese Datei ein...')
 
-    const reader = new FileReader()
-    reader.onload = async (evt) => {
-      try {
-        const bstr = evt.target?.result
-        const wb = XLSX.read(bstr, { type: 'binary' })
-        const ws = wb.Sheets[wb.SheetNames[0]]
-        const data = XLSX.utils.sheet_to_json(ws)
+    try {
+      let rawData: any[] = []
 
-        const formattedData = data.map((row: any) => ({
-          sku: String(row.SKU || row.sku || '').trim(),
-          brand: String(row.Marke || row.brand || '').trim(),
-          category: String(row.Kategorie || row.category || 'Skis').trim(),
-          title: String(row.Titel || row.title || '').trim(),
-          length: String(row.Länge || row.length || '').trim(),
-          color: String(row.Farbe || row.color || '').trim(),
-          price_ek: parseFloat(row.EK || row.price_ek || 0),
-          price_vk: parseFloat(row.VK || row.price_vk || 0),
-          stock_main: parseInt(row.BestandHauptlager || row.stock_main || 0),
-          stock_external: parseInt(row.BestandAussenlager || row.stock_external || 0),
-          image_url: row.Bild || row.image_url || null,
-        }))
+      if (file.name.toLowerCase().endsWith('.csv')) {
+        const text = await file.text()
+        rawData = parseCsvString(text)
+      } else {
+        const workbook = new ExcelJS.Workbook()
+        const arrayBuffer = await file.arrayBuffer()
+        await workbook.xlsx.load(arrayBuffer)
 
-        const { error } = await supabase.from('products').upsert(formattedData, { onConflict: 'sku,length' })
+        const worksheet = workbook.worksheets[0]
+        const headers: string[] = []
 
-        if (error) setUploadStatus('Fehler: ' + error.message)
-        else {
-          setUploadStatus(`✅ ${formattedData.length} Produkte aktualisiert!`)
-          loadData()
-        }
-      } catch (err: any) {
-        setUploadStatus('Fehler: ' + err.message)
+        worksheet?.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) {
+            row.eachCell((cell, colNumber) => {
+              headers[colNumber] = cell.text ? String(cell.text).trim() : ''
+            })
+          } else {
+            const rowObj: any = {}
+            row.eachCell((cell, colNumber) => {
+              const header = headers[colNumber]
+              if (header) {
+                let val = cell.value
+                if (val !== null && typeof val === 'object') {
+                  if ('result' in val) val = (val as any).result
+                  else if ('text' in val) val = (val as any).text
+                }
+                rowObj[header] = val
+              }
+            })
+            if (Object.keys(rowObj).length > 0) rawData.push(rowObj)
+          }
+        })
       }
-      setIsUploading(false)
+
+      const formattedData = rawData.map((row: any) => ({
+        sku: String(row.SKU || row.sku || '').trim(),
+        brand: String(row.Marke || row.brand || '').trim(),
+        category: String(row.Kategorie || row.category || 'Skis').trim(),
+        title: String(row.Titel || row.title || '').trim(),
+        length: String(row.Länge || row.length || '').trim(),
+        color: String(row.Farbe || row.color || '').trim(),
+        price_ek: parseFloat(row.EK || row.price_ek || 0) || 0,
+        price_vk: parseFloat(row.VK || row.price_vk || 0) || 0,
+        stock_main: parseInt(row.BestandHauptlager || row.stock_main || 0) || 0,
+        stock_external: parseInt(row.BestandAussenlager || row.stock_external || 0) || 0,
+        image_url: row.Bild || row.image_url || null,
+      })).filter(item => item.sku !== '')
+
+      const { error } = await supabase.from('products').upsert(formattedData, { onConflict: 'sku,length' })
+
+      if (error) setUploadStatus('Fehler: ' + error.message)
+      else {
+        setUploadStatus(`✅ ${formattedData.length} Produkte aktualisiert!`)
+        loadData()
+      }
+    } catch (err: any) {
+      setUploadStatus('Fehler: ' + err.message)
     }
-    reader.readAsBinaryString(file)
+    setIsUploading(false)
   }
 
-  // Excel Preview & Upload States
-  const [previewData, setPreviewData] = useState<any[]>([])
-
   // 1. MUSTER-EXCEL-VORLAGE GENERIEREN & HERUNTERLADEN
-  const downloadTemplate = () => {
+  const downloadTemplate = async () => {
     const templateData = [
       {
         SKU: 'SK-AT-G9',
@@ -224,98 +308,151 @@ export default function AdminDashboard() {
       }
     ]
 
-    const ws = XLSX.utils.json_to_sheet(templateData)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Produkte_Vorlage')
-    XLSX.writeFile(wb, 'Outback_B2B_Produkt_Vorlage.xlsx')
+    const workbook = new ExcelJS.Workbook()
+    const worksheet = workbook.addWorksheet('Produkte_Vorlage')
+
+    worksheet.columns = [
+      { header: 'SKU', key: 'SKU', width: 15 },
+      { header: 'Marke', key: 'Marke', width: 15 },
+      { header: 'Kategorie', key: 'Kategorie', width: 15 },
+      { header: 'Titel', key: 'Titel', width: 25 },
+      { header: 'Länge', key: 'Länge', width: 12 },
+      { header: 'Farbe', key: 'Farbe', width: 10 },
+      { header: 'EK', key: 'EK', width: 12 },
+      { header: 'VK', key: 'VK', width: 12 },
+      { header: 'BestandHauptlager', key: 'BestandHauptlager', width: 18 },
+      { header: 'BestandAussenlager', key: 'BestandAussenlager', width: 18 },
+      { header: 'Bild', key: 'Bild', width: 25 }
+    ]
+
+    templateData.forEach(item => worksheet.addRow(item))
+
+    const buffer = await workbook.xlsx.writeBuffer()
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'Outback_B2B_Produkt_Vorlage.xlsx'
+    a.click()
+    window.URL.revokeObjectURL(url)
   }
 
-  // 2. EXCEL DATEI LESEN & VORSCHAU ERZEUGEN
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 2. EXCEL / CSV DATEI LESEN & VORSCHAU ERZEUGEN
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
     setUploadStatus('Lese Datei ein...')
 
-    const reader = new FileReader()
-    reader.onload = (evt) => {
-      try {
-        const bstr = evt.target?.result
-        const wb = XLSX.read(bstr, { type: 'binary' })
-        const ws = wb.Sheets[wb.SheetNames[0]]
-        const rawData = XLSX.utils.sheet_to_json(ws)
+    try {
+      let rawData: any[] = []
 
-        // Flexible Zuordnung der Spaltenbezeichnungen
-        const parsed = rawData.map((row: any) => {
-          const sku = String(row.SKU || row.sku || row.Artikelnummer || '').trim()
-          const length = String(row.Länge || row.length || row.Laenge || '').trim()
-          const exists = products.some(p => p.sku === sku && (p.length || '') === length)
+      if (file.name.toLowerCase().endsWith('.csv')) {
+        const text = await file.text()
+        rawData = parseCsvString(text)
+      } else {
+        const workbook = new ExcelJS.Workbook()
+        const arrayBuffer = await file.arrayBuffer()
+        await workbook.xlsx.load(arrayBuffer)
 
-          return {
-            sku,
-            brand: String(row.Marke || row.brand || row.Hersteller || '').trim(),
-            category: String(row.Kategorie || row.category || 'Skis').trim(),
-            title: String(row.Titel || row.title || row.Bezeichnung || '').trim(),
-            length,
-            color: String(row.Farbe || row.color || '').trim(),
-            price_ek: parseFloat(row.EK || row.price_ek || row.Einkaufspreis || 0),
-            price_vk: parseFloat(row.VK || row.price_vk || row.Verkaufspreis || row.B2BPreis || 0),
-            stock_main: parseInt(row.BestandHauptlager || row.stock_main || row.Hauptlager || 0),
-            stock_external: parseInt(row.BestandAussenlager || row.stock_external || row.Aussenlager || 0),
-            image_url: row.Bild || row.image_url || row.BildURL || null,
-            isUpdate: exists
+        const worksheet = workbook.worksheets[0]
+        if (!worksheet) throw new Error('Kein Arbeitsblatt in der Datei gefunden.')
+
+        const headers: string[] = []
+
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) {
+            row.eachCell((cell, colNumber) => {
+              headers[colNumber] = cell.text ? String(cell.text).trim() : ''
+            })
+          } else {
+            const rowObj: any = {}
+            row.eachCell((cell, colNumber) => {
+              const header = headers[colNumber]
+              if (header) {
+                let val = cell.value
+                if (val !== null && typeof val === 'object') {
+                  if ('result' in val) val = (val as any).result
+                  else if ('text' in val) val = (val as any).text
+                  else if ('hyperlink' in val) val = (val as any).text || (val as any).hyperlink
+                }
+                rowObj[header] = val
+              }
+            })
+            if (Object.keys(rowObj).length > 0) rawData.push(rowObj)
           }
-        }).filter(item => item.sku !== '')
-
-        setPreviewData(parsed)
-        setUploadStatus(`${parsed.length} gültige Produkte zur Vorschau geladen.`)
-      } catch (err: any) {
-        setUploadStatus('Fehler beim Einlesen: ' + err.message)
+        })
       }
+
+      // Flexible Zuordnung der Spaltenbezeichnungen
+      const parsed = rawData.map((row: any) => {
+        const sku = String(row.SKU || row.sku || row.Artikelnummer || '').trim()
+        const length = String(row.Länge || row.length || row.Laenge || '').trim()
+        const exists = products.some(p => p.sku === sku && (p.length || '') === length)
+
+        return {
+          sku,
+          brand: String(row.Marke || row.brand || row.Hersteller || '').trim(),
+          category: String(row.Kategorie || row.category || 'Skis').trim(),
+          title: String(row.Titel || row.title || row.Bezeichnung || '').trim(),
+          length,
+          color: String(row.Farbe || row.color || '').trim(),
+          price_ek: parseFloat(row.EK || row.price_ek || row.Einkaufspreis || 0) || 0,
+          price_vk: parseFloat(row.VK || row.price_vk || row.Verkaufspreis || row.B2BPreis || 0) || 0,
+          stock_main: parseInt(row.BestandHauptlager || row.stock_main || row.Hauptlager || 0) || 0,
+          stock_external: parseInt(row.BestandAussenlager || row.stock_external || row.Aussenlager || 0) || 0,
+          image_url: row.Bild || row.image_url || row.BildURL || null,
+          isUpdate: exists
+        }
+      }).filter(item => item.sku !== '')
+
+      setPreviewData(parsed)
+      setUploadStatus(`${parsed.length} gültige Produkte zur Vorschau geladen.`)
+    } catch (err: any) {
+      setUploadStatus('Fehler beim Einlesen: ' + err.message)
     }
-    reader.readAsBinaryString(file)
   }
 
   // 3. VORSCHAU IN DATENBANK SPEICHERN (UPSERT)
-    const handleConfirmUpload = async () => {
-        if (previewData.length === 0) return
+  const handleConfirmUpload = async () => {
+    if (previewData.length === 0) return
 
-        setIsUploading(true)
-        setUploadStatus('Lade Daten in die Datenbank...')
+    setIsUploading(true)
+    setUploadStatus('Lade Daten in die Datenbank...')
 
-        const dataToUpload = previewData.map(({ isUpdate, ...item }) => item)
+    const dataToUpload = previewData.map(({ isUpdate, ...item }) => item)
 
-        try {
-        const res = await fetch('/api/admin/upload-products', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ products: dataToUpload }),
-        })
+    try {
+      const res = await fetch('/api/admin/upload-products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ products: dataToUpload }),
+      })
 
-        const contentType = res.headers.get('content-type')
-        if (!contentType || !contentType.includes('application/json')) {
-            const textError = await res.text()
-            console.error('Server HTML Error:', textError)
-            setUploadStatus(`Fehler (${res.status}): API-Route nicht gefunden oder Server-Crash. Bitte Terminal log prüfen.`)
-            setIsUploading(false)
-            return
-        }
-
-        const result = await res.json()
-
-        if (!res.ok) {
-            setUploadStatus('Fehler beim Import: ' + result.error)
-        } else {
-            setUploadStatus(`🎉 Erfolgreich ${dataToUpload.length} Produkte verarbeitet!`)
-            setPreviewData([])
-            loadData()
-        }
-        } catch (err: any) {
-        setUploadStatus('Netzwerkfehler: ' + err.message)
-        }
-
+      const contentType = res.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        const textError = await res.text()
+        console.error('Server HTML Error:', textError)
+        setUploadStatus(`Fehler (${res.status}): API-Route nicht gefunden oder Server-Crash. Bitte Terminal log prüfen.`)
         setIsUploading(false)
+        return
+      }
+
+      const result = await res.json()
+
+      if (!res.ok) {
+        setUploadStatus('Fehler beim Import: ' + result.error)
+      } else {
+        setUploadStatus(`🎉 Erfolgreich ${dataToUpload.length} Produkte verarbeitet!`)
+        setPreviewData([])
+        loadData()
+      }
+    } catch (err: any) {
+      setUploadStatus('Netzwerkfehler: ' + err.message)
     }
+
+    setIsUploading(false)
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
@@ -490,6 +627,20 @@ export default function AdminDashboard() {
                     <input type="text" required value={newCustomer.city} onChange={e => setNewCustomer({...newCustomer, city: e.target.value})} className="w-full p-2 border rounded" placeholder="Bozen" />
                   </div>
                 </div>
+
+                {/* ADMIN CHECKBOX */}
+                <div className="pt-2">
+                  <label className="inline-flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newCustomer.is_admin}
+                      onChange={e => setNewCustomer({...newCustomer, is_admin: e.target.checked})}
+                      className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
+                    />
+                    <span className="text-xs font-bold text-gray-700">Als Admin-Benutzer festlegen (Ja / Nein)</span>
+                  </label>
+                </div>
+
                 <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded text-sm mt-4">
                   Kunde Registrieren & Freischalten
                 </button>
@@ -505,6 +656,7 @@ export default function AdminDashboard() {
                     <th className="p-2">Kontakt</th>
                     <th className="p-2">E-Mail</th>
                     <th className="p-2">Ort</th>
+                    <th className="p-2">Rolle (Admin)</th>
                     <th className="p-2">Status</th>
                   </tr>
                 </thead>
@@ -516,6 +668,23 @@ export default function AdminDashboard() {
                       <td className="p-2 font-mono">{c.email}</td>
                       <td className="p-2">{c.zip_code} {c.city}</td>
                       <td className="p-2">
+                        <button
+                          onClick={() => handleToggleAdmin(c)}
+                          title="Klicke zum Umschalten"
+                          className="cursor-pointer"
+                        >
+                          {c.is_admin ? (
+                            <span className="bg-purple-100 text-purple-800 text-[10px] px-2 py-0.5 rounded font-bold hover:bg-purple-200">
+                              👑 Admin (Ja)
+                            </span>
+                          ) : (
+                            <span className="bg-gray-100 text-gray-600 text-[10px] px-2 py-0.5 rounded font-bold hover:bg-gray-200">
+                              👤 Kunde (Nein)
+                            </span>
+                          )}
+                        </button>
+                      </td>
+                      <td className="p-2">
                         <span className="bg-green-100 text-green-800 text-[10px] px-2 py-0.5 rounded font-bold">Aktiv</span>
                       </td>
                     </tr>
@@ -526,8 +695,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* TAB 3: EXCEL UPLOAD */}
-{/* TAB 3: OPTIMIERTER EXCEL UPLOAD MIT VORSCHAU */}
+        {/* TAB 3: EXCEL / CSV UPLOAD MIT VORSCHAU */}
         {activeTab === 'upload' && (
           <div className="space-y-6">
             <div className="bg-white p-6 rounded-lg shadow-sm border flex flex-col md:flex-row justify-between items-center gap-4">

@@ -14,6 +14,7 @@ export default function ShopPage() {
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [userEmail, setUserEmail] = useState('')
   const [orderSubmitting, setOrderSubmitting] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false) // <-- NEU: State für Admin-Status
   const [orderSuccess, setOrderSuccess] = useState(false)
 
   const { t } = useLanguage()
@@ -49,9 +50,20 @@ export default function ShopPage() {
   }
 
   // Funktion zum Laden/Aktualisieren der Produktdaten aus Supabase
-  const fetchProducts = async () => {
+const fetchProducts = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    if (user?.email) setUserEmail(user.email)
+    if (user?.email) {
+      setUserEmail(user.email)
+      
+      // NEU: Admin-Status aus der Kunden-Tabelle abfragen
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('is_admin')
+        .eq('email', user.email.trim().toLowerCase())
+        .single()
+      
+      if (customer?.is_admin) setIsAdmin(true)
+    }
 
     const { data, error } = await supabase
       .from('products')
@@ -192,6 +204,14 @@ export default function ShopPage() {
 
           <div className="flex items-center gap-4">
             <LanguageSwitcher />
+            
+            {/* NEU: Admin-Link (nur sichtbar, wenn isAdmin true ist) */}
+            {isAdmin && (
+              <a href="/admin" className="text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md transition flex items-center gap-1">
+                ⚙️ Admin
+              </a>
+            )}
+
             <button
               onClick={() => setIsCartOpen(true)}
               className="relative bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2"
