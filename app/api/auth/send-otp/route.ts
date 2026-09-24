@@ -48,7 +48,7 @@ export async function POST(request: Request) {
 
     // 3. E-Mail direkt über Resend versenden
     const emailResult = await resend.emails.send({
-      from: 'Outback B2B <onboarding@resend.dev>', // Nach Domain-Verifizierung z.B. auth@outback.it
+      from: 'Outback B2B <info@b2b.outback.it>', // Nach Domain-Verifizierung z.B. auth@outback.it
       to: [cleanEmail],
       subject: `${otpCode} ist dein Outback B2B Login-Code`,
       html: `

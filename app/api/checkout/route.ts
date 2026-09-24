@@ -151,8 +151,8 @@ export async function POST(request: Request) {
 
     // 5. E-Mail via Resend schicken
     await resend.emails.send({
-      from: 'Outback B2B <onboarding@resend.dev>',
-      to: ['guenther@outback.it'],
+      from: 'Outback B2B <noreply@b2b.outback.it>',
+      to: ['guenther@outback.it'], //später info@outback.it
       replyTo: userEmail,
       subject: `[B2B Bestellung] ${customer?.company_name || userEmail}`,
       html: emailHtml,
