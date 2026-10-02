@@ -15,7 +15,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Dati prodotti non validi' }, { status: 400 })
     }
 
-    // Bilder im Hintergrund herunterladen, verkleinern und zu Supabase hochladen
+    // 1. Bilder verarbeiten & hochladen
     const processedProducts = await Promise.all(
       products.map(async (p: any) => {
         let imageUrl = p.image_url
@@ -32,16 +32,39 @@ export async function POST(request: Request) {
       })
     )
 
-    // Upsert in die Produktdatenbank mit den neuen, sicheren Bild-URLs
-    const { error } = await supabaseAdmin
-      .from('products')
-      .upsert(processedProducts, { onConflict: 'sku,length' })
+    // 2. DUPLIKATE ENTFERNEN: Falls die gleiche SKU + Länge mehrfach in der Excel vorhanden ist,
+    // behalten wir nur den letzten Eintrag, um den Postgres 21000 Fehler zu verhindern.
+    const uniqueProductsMap = new Map<string, any>()
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    for (const prod of processedProducts) {
+      // Eindeutiger Schlüssel aus SKU und Länge (oder nur SKU)
+      const uniqueKey = `${(prod.sku || '').trim().toLowerCase()}_${(prod.length || '').trim().toLowerCase()}`
+      uniqueProductsMap.set(uniqueKey, prod)
     }
 
-    return NextResponse.json({ success: true, count: processedProducts.length })
+    const deduplicatedProducts = Array.from(uniqueProductsMap.values())
+
+    // 3. Upsert in Supabase ausführen
+    const { error } = await supabaseAdmin
+      .from('products')
+      .upsert(deduplicatedProducts, { onConflict: 'sku,length' })
+
+    if (error) {
+      // Falls der Constraint in Supabase nur auf 'sku' liegt, versuchen wir es mit 'sku'
+      if (error.message.includes('onConflict') || error.code === '42704') {
+        const { error: fallbackError } = await supabaseAdmin
+          .from('products')
+          .upsert(deduplicatedProducts, { onConflict: 'sku' })
+
+        if (fallbackError) {
+          return NextResponse.json({ error: fallbackError.message }, { status: 500 })
+        }
+      } else {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+    }
+
+    return NextResponse.json({ success: true, count: deduplicatedProducts.length })
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Errore durante l\'importazione' }, { status: 500 })
   }
