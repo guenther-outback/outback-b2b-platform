@@ -16,7 +16,6 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
   const [applyImageToSameColor, setApplyImageToSameColor] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
 
-  // State für die Inline-Bearbeitung der Lagerbestände in der Tabelle
   const [stockInputs, setStockInputs] = useState<{ [variantId: string]: { main: number; ext: number } }>({})
   const [savingStockId, setSavingStockId] = useState<string | null>(null)
 
@@ -31,7 +30,6 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
     setOpenGroupKey(prevKey => (prevKey === key ? null : key))
   }
 
-  // Lagerbestand direkt in der Tabellenzeile anpassen
   const handleStockInputChange = (variantId: string, field: 'main' | 'ext', value: number) => {
     setStockInputs(prev => ({
       ...prev,
@@ -42,7 +40,6 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
     }))
   }
 
-  // Lagerbestand direkt in Supabase speichern
   const handleSaveStock = async (variant: any) => {
     const inputs = stockInputs[variant.id]
     if (!inputs) return
@@ -178,8 +175,8 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-    {/* Form Creazione / Modifica */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border h-fit lg:sticky lg:top-20">
+      {/* Form Creazione / Modifica (Nicht mehr sticky auf Mobilgeräten) */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 h-fit lg:sticky lg:top-20">
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-bold text-lg text-gray-800">{editingId ? 'Modifica Variante' : 'Crea Variante Prodotto'}</h2>
           {editingId && <button onClick={resetForm} className="text-xs text-red-500 underline">Annulla</button>}
@@ -278,9 +275,9 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
         </form>
       </div>
 
-      {/* Suche & Tabellen-Akkordeon */}
+      {/* Suche & Helle Akkordeon-Produktboxen */}
       <div className="lg:col-span-2 space-y-4">
-        <div className="bg-white p-3 rounded-lg shadow-sm border flex items-center gap-3">
+        <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 flex items-center gap-3">
           <span className="text-gray-400 pl-1">🔍</span>
           <input
             type="text"
@@ -295,7 +292,7 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
         </div>
 
         {filteredGroupKeys.length === 0 ? (
-          <div className="bg-white p-8 rounded-lg shadow-sm border text-center text-gray-500 text-sm">
+          <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 text-center text-gray-500 text-sm">
             Nessun modello trovato per "{searchTerm}".
           </div>
         ) : (
@@ -307,42 +304,45 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
             const isOpen = openGroupKey === groupKey
 
             return (
-              <div key={groupKey} className="bg-white rounded-lg shadow-sm border overflow-hidden transition">
+              <div key={groupKey} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden transition hover:border-gray-300">
+                {/* Helles Header-Design per il Modello */}
                 <button
                   onClick={() => toggleGroup(groupKey)}
-                  className="w-full p-4 bg-slate-900 hover:bg-slate-800 text-white flex justify-between items-center text-left transition"
+                  className="w-full p-4 bg-white hover:bg-slate-50 text-gray-800 flex justify-between items-center text-left transition"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-lg">{isOpen ? '🔽' : '▶️'}</span>
-                    {main.image_url && (
-                      <img src={main.image_url} alt={main.title} className="w-10 h-10 object-contain rounded bg-white p-1" />
+                    <span className="text-xs text-gray-400">{isOpen ? '🔽' : '▶️'}</span>
+                    {main.image_url ? (
+                      <img src={main.image_url} alt={main.title} className="w-10 h-10 object-contain rounded border border-gray-200 bg-white p-1" />
+                    ) : (
+                      <div className="w-10 h-10 rounded border border-gray-200 bg-gray-50 flex items-center justify-center text-[10px] text-gray-400">No img</div>
                     )}
                     <div>
-                      <span className="text-xs font-bold text-blue-400 uppercase tracking-wide">{main.brand}</span>
-                      <h3 className="font-bold text-base leading-tight">{main.title}</h3>
+                      <span className="text-xs font-bold text-blue-600 uppercase tracking-wide">{main.brand}</span>
+                      <h3 className="font-bold text-base text-gray-900 leading-tight">{main.title}</h3>
                     </div>
                   </div>
 
                   <div className="text-right text-xs">
-                    <span className="bg-slate-800 px-2.5 py-1 rounded text-slate-300 font-medium border border-slate-700">
-                      {variants.length} Varianti | Totale: <strong className="text-emerald-400">{totalMainStock + totalExtStock} pz.</strong>
+                    <span className="bg-gray-100 px-2.5 py-1 rounded text-gray-600 font-medium border border-gray-200">
+                      {variants.length} Varianti | Totale: <strong className="text-emerald-700">{totalMainStock + totalExtStock} pz.</strong>
                     </span>
                   </div>
                 </button>
 
                 {isOpen && (
-                  <div className="overflow-x-auto border-t border-slate-700">
+                  <div className="overflow-x-auto border-t border-gray-200">
                     <table className="w-full text-left text-xs">
                       <thead>
-                        <tr className="bg-gray-100 border-b text-gray-600">
-                          <th className="p-2">Img</th>
-                          <th className="p-2">SKU</th>
-                          <th className="p-2">Colore</th>
-                          <th className="p-2">Lunghezza</th>
-                          <th className="p-2">Prezzo B2B</th>
-                          <th className="p-2 text-emerald-700">Mag. Princ.</th>
-                          <th className="p-2 text-amber-700">Mag. Est.</th>
-                          <th className="p-2 text-right">Azione</th>
+                        <tr className="bg-gray-50 border-b border-gray-200 text-gray-500">
+                          <th className="p-2.5">Img</th>
+                          <th className="p-2.5">SKU</th>
+                          <th className="p-2.5">Colore</th>
+                          <th className="p-2.5">Lunghezza</th>
+                          <th className="p-2.5">Prezzo B2B</th>
+                          <th className="p-2.5 text-emerald-700">Mag. Princ.</th>
+                          <th className="p-2.5 text-amber-700">Mag. Est.</th>
+                          <th className="p-2.5 text-right">Azione</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -356,38 +356,36 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
                           )
 
                           return (
-                            <tr key={v.id} className={`border-b hover:bg-gray-50 ${editingId === v.id ? 'bg-amber-50' : ''} ${isOut ? 'bg-red-50/50' : ''}`}>
+                            <tr key={v.id} className={`border-b border-gray-100 hover:bg-slate-50 ${editingId === v.id ? 'bg-amber-50' : ''} ${isOut ? 'bg-red-50/40' : ''}`}>
                               <td className="p-2">
                                 {v.image_url ? (
-                                  <img src={v.image_url} alt={v.title} className="w-7 h-7 object-contain rounded border bg-white" />
+                                  <img src={v.image_url} alt={v.title} className="w-7 h-7 object-contain rounded border border-gray-200 bg-white" />
                                 ) : (
                                   <span className="text-[10px] text-gray-400">No img</span>
                                 )}
                               </td>
-                              <td className="p-2 font-mono font-bold">{v.sku}</td>
-                              <td className="p-2 font-semibold">{v.color || '-'}</td>
-                              <td className="p-2">{v.length || '-'}</td>
-                              <td className="p-2 font-bold">{(v.price_vk || 0).toFixed(2)} €</td>
+                              <td className="p-2 font-mono font-bold text-gray-800">{v.sku}</td>
+                              <td className="p-2 font-semibold text-gray-700">{v.color || '-'}</td>
+                              <td className="p-2 text-gray-600">{v.length || '-'}</td>
+                              <td className="p-2 font-bold text-gray-900">{(v.price_vk || 0).toFixed(2)} €</td>
                               
-                              {/* Direkte Bearbeitung Magazzino Principale */}
                               <td className="p-2">
                                 <input
                                   type="number"
                                   min="0"
                                   value={currentMainInput}
                                   onChange={e => handleStockInputChange(v.id, 'main', parseInt(e.target.value) || 0)}
-                                  className="w-14 p-1 border rounded text-center text-xs font-bold text-emerald-700 bg-emerald-50/50 focus:bg-white"
+                                  className="w-14 p-1 border border-emerald-300 rounded text-center text-xs font-bold text-emerald-800 bg-emerald-50/50 focus:bg-white focus:ring-1 focus:ring-emerald-500"
                                 />
                               </td>
 
-                              {/* Direkte Bearbeitung Magazzino Esterno */}
                               <td className="p-2">
                                 <input
                                   type="number"
                                   min="0"
                                   value={currentExtInput}
                                   onChange={e => handleStockInputChange(v.id, 'ext', parseInt(e.target.value) || 0)}
-                                  className="w-14 p-1 border rounded text-center text-xs font-bold text-amber-700 bg-amber-50/50 focus:bg-white"
+                                  className="w-14 p-1 border border-amber-300 rounded text-center text-xs font-bold text-amber-800 bg-amber-50/50 focus:bg-white focus:ring-1 focus:ring-amber-500"
                                 />
                               </td>
 
@@ -402,8 +400,8 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
                                     💾
                                   </button>
                                 )}
-                                <button onClick={() => handleEditClick(v, groupKey)} className="p-1 text-slate-600 hover:text-blue-600 text-sm" title="Modifica variante">✏️</button>
-                                <button onClick={() => handleDeleteProduct(v.id)} className="p-1 text-red-500 hover:text-red-700 text-sm" title="Elimina variante">✕</button>
+                                <button onClick={() => handleEditClick(v, groupKey)} className="p-1 text-slate-500 hover:text-blue-600 text-sm" title="Modifica variante">✏️</button>
+                                <button onClick={() => handleDeleteProduct(v.id)} className="p-1 text-red-400 hover:text-red-600 text-sm" title="Elimina variante">✕</button>
                               </td>
                             </tr>
                           )
