@@ -37,18 +37,36 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
-      <header className="bg-slate-900 text-white p-4 shadow">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <h1 className="text-xl font-bold">OUTBACK Admin Dashboard</h1>
-          <a href="/shop" className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded border border-slate-600">Vai al Shop →</a>
+      {/* Moderner, schlichter Admin Header */}
+      <header className="bg-slate-900/95 backdrop-blur-md text-slate-100 sticky top-0 z-30 border-b border-slate-800/80 shadow-sm transition-all">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <h1 className="text-base sm:text-lg font-semibold tracking-tight text-white">
+              OUTBACK <span className="text-xs font-normal text-purple-400 uppercase tracking-widest ml-1">Admin</span>
+            </h1>
+          </div>
+
+          <a 
+            href="/shop" 
+            className="text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5"
+          >
+            <span>Vai al Shop</span>
+            <span className="text-slate-400">→</span>
+          </a>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-8 w-full flex-1">
-        <div className="flex border-b border-gray-300 mb-6 gap-4">
-          <button onClick={() => setActiveTab('products')} className={`pb-2 px-4 font-medium text-sm border-b-2 ${activeTab === 'products' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'}`}>📦 Modelli & Varianti ({Object.keys(groupedProducts).length} Modelli)</button>
-          <button onClick={() => setActiveTab('customers')} className={`pb-2 px-4 font-medium text-sm border-b-2 ${activeTab === 'customers' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'}`}>👥 Whitelist Clienti ({customers.length})</button>
-          <button onClick={() => setActiveTab('upload')} className={`pb-2 px-4 font-medium text-sm border-b-2 ${activeTab === 'upload' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'}`}>📊 Importazione Excel / CSV</button>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 w-full flex-1">
+        <div className="flex border-b border-gray-300 mb-6 gap-4 overflow-x-auto">
+          <button onClick={() => setActiveTab('products')} className={`pb-2 px-4 font-medium text-sm border-b-2 whitespace-nowrap ${activeTab === 'products' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'}`}>
+            📦 Modelli & Varianti ({Object.keys(groupedProducts).length})
+          </button>
+          <button onClick={() => setActiveTab('customers')} className={`pb-2 px-4 font-medium text-sm border-b-2 whitespace-nowrap ${activeTab === 'customers' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'}`}>
+            👥 Whitelist Clienti ({customers.length})
+          </button>
+          <button onClick={() => setActiveTab('upload')} className={`pb-2 px-4 font-medium text-sm border-b-2 whitespace-nowrap ${activeTab === 'upload' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'}`}>
+            📊 Importazione Excel / CSV
+          </button>
         </div>
 
         {loading ? (

@@ -193,38 +193,69 @@ export default function ShopPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <header className="bg-slate-900 text-white sticky top-0 z-10 shadow-md">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-xl font-bold tracking-wide">OUTBACK B2B</h1>
-            <p className="text-xs text-slate-400">{t('shop.logged_in_as')}: {userEmail}</p>
+    {/* Moderner, schlichter B2B Header */}
+      <header className="bg-slate-900/95 backdrop-blur-md text-slate-100 sticky top-0 z-30 border-b border-slate-800/80 shadow-sm transition-all">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+          
+          {/* Branding & Status */}
+          <div className="flex items-center gap-3 min-w-0">
+            <a href="/shop" className="text-base sm:text-lg font-semibold tracking-tight text-white hover:opacity-90 transition">
+              OUTBACK <span className="text-xs font-normal text-slate-400 uppercase tracking-widest ml-1">B2B</span>
+            </a>
+            {userEmail && (
+              <>
+                <span className="hidden sm:inline text-slate-700">|</span>
+                <span className="hidden sm:inline text-xs text-slate-400 truncate max-w-[200px]" title={userEmail}>
+                  {userEmail}
+                </span>
+              </>
+            )}
           </div>
 
-          <div className="flex items-center gap-4">
+          {/* Actions & Navigation */}
+          <div className="flex items-center gap-2 sm:gap-3">
             <LanguageSwitcher />
-            
+
             {isAdmin && (
-              <a href="/admin" className="text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md transition flex items-center gap-1">
-                ⚙️ Admin
+              <a 
+                href="/admin" 
+                className="text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5"
+                title="Admin Dashboard"
+              >
+                <span className="text-purple-400 text-xs">⚙️</span>
+                <span className="hidden sm:inline">Admin</span>
               </a>
             )}
 
+            {/* Warenkorb Button */}
             <button
               onClick={() => setIsCartOpen(true)}
-              className="relative bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2"
+              className="relative text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 shadow-sm"
             >
-              🛒 {t('shop.cart')}
-              {cart.length > 0 && (
-                <span className="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              </svg>
+              <span className="hidden sm:inline">{t('shop.cart')}</span>
+              {cart.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0) > 0 && (
+                <span className="bg-white text-blue-700 text-[10px] font-bold rounded-full h-4 min-w-[16px] px-1 flex items-center justify-center">
                   {cart.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)}
                 </span>
               )}
             </button>
-            <button onClick={handleLogout} className="text-xs text-slate-300 hover:text-white underline">
-              {t('shop.logout')}
+
+            {/* Abmelden Icon/Link */}
+            <button 
+              onClick={handleLogout} 
+              className="text-xs text-slate-400 hover:text-slate-200 transition-colors p-1 ml-1"
+              title={t('shop.logout')}
+            >
+              <svg className="w-4 h-4 sm:hidden" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              <span className="hidden sm:inline underline decoration-slate-600 underline-offset-4">{t('shop.logout')}</span>
             </button>
           </div>
+
         </div>
       </header>
 

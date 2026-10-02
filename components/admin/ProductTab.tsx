@@ -14,9 +14,11 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
   const [uploadingImage, setUploadingImage] = useState(false)
   const [openGroupKey, setOpenGroupKey] = useState<string | null>(null)
   const [applyImageToSameColor, setApplyImageToSameColor] = useState(true)
-
-  // Such-State für das Admin-Dashboard
   const [searchTerm, setSearchTerm] = useState('')
+
+  // State für die Inline-Bearbeitung der Lagerbestände in der Tabelle
+  const [stockInputs, setStockInputs] = useState<{ [variantId: string]: { main: number; ext: number } }>({})
+  const [savingStockId, setSavingStockId] = useState<string | null>(null)
 
   const [productForm, setProductForm] = useState({
     sku: '', brand: '', category: 'Skis', title: '', length: '', color: '',
@@ -29,7 +31,39 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
     setOpenGroupKey(prevKey => (prevKey === key ? null : key))
   }
 
-  // Upload dell'immagine su Supabase Storage
+  // Lagerbestand direkt in der Tabellenzeile anpassen
+  const handleStockInputChange = (variantId: string, field: 'main' | 'ext', value: number) => {
+    setStockInputs(prev => ({
+      ...prev,
+      [variantId]: {
+        main: field === 'main' ? value : (prev[variantId]?.main ?? 0),
+        ext: field === 'ext' ? value : (prev[variantId]?.ext ?? 0)
+      }
+    }))
+  }
+
+  // Lagerbestand direkt in Supabase speichern
+  const handleSaveStock = async (variant: any) => {
+    const inputs = stockInputs[variant.id]
+    if (!inputs) return
+
+    setSavingStockId(variant.id)
+    const { error } = await supabase
+      .from('products')
+      .update({
+        stock_main: inputs.main,
+        stock_external: inputs.ext
+      })
+      .eq('id', variant.id)
+
+    if (error) {
+      alert('Errore durante l\'aggiornamento della giacenza: ' + error.message)
+    } else {
+      loadData()
+    }
+    setSavingStockId(null)
+  }
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -61,17 +95,11 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
     setUploadingImage(false)
   }
 
-  // Salva o aggiorna prodotto
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault()
-    
     try {
       if (editingId) {
-        const { error } = await supabase
-          .from('products')
-          .update(productForm)
-          .eq('id', editingId)
-
+        const { error } = await supabase.from('products').update(productForm).eq('id', editingId)
         if (error) throw error
 
         if (applyImageToSameColor && productForm.color && productForm.image_url) {
@@ -82,13 +110,9 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
             .eq('title', productForm.title)
             .eq('color', productForm.color)
         }
-
         alert('Variante aggiornata con successo!')
       } else {
-        const { error } = await supabase
-          .from('products')
-          .insert([productForm])
-
+        const { error } = await supabase.from('products').insert([productForm])
         if (error) throw error
 
         if (applyImageToSameColor && productForm.color && productForm.image_url) {
@@ -99,10 +123,8 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
             .eq('title', productForm.title)
             .eq('color', productForm.color)
         }
-
         alert('Nuova variante creata!')
       }
-
       resetForm()
       loadData()
     } catch (err: any) {
@@ -142,13 +164,10 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
     })
   }
 
-  // Filter-Logik für die Modell-Gruppen
   const filteredGroupKeys = Object.keys(groupedProducts).filter(groupKey => {
     if (!searchTerm.trim()) return true
-
     const variants = groupedProducts[groupKey]
     const term = searchTerm.toLowerCase()
-
     return variants.some(v => 
       (v.title && v.title.toLowerCase().includes(term)) ||
       (v.brand && v.brand.toLowerCase().includes(term)) ||
@@ -220,7 +239,6 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
             </div>
           </div>
 
-          {/* Upload Immagine Manuale */}
           <div className="p-3 bg-gray-50 rounded border space-y-2">
             <label className="block text-xs font-semibold text-gray-700">Immagine Prodotto (Upload)</label>
             <input
@@ -239,7 +257,6 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
               </div>
             )}
 
-            {/* Checkbox per applicare l'immagine a tutte le varianti dello stesso colore */}
             {productForm.color && (
               <div className="pt-2 border-t mt-2">
                 <label className="inline-flex items-center gap-2 cursor-pointer text-xs text-gray-700">
@@ -261,10 +278,8 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
         </form>
       </div>
 
-      {/* Rechte Spalte: Suchleiste & Akkordeon Liste */}
+      {/* Suche & Tabellen-Akkordeon */}
       <div className="lg:col-span-2 space-y-4">
-        
-        {/* Suchleiste im Backend */}
         <div className="bg-white p-3 rounded-lg shadow-sm border flex items-center gap-3">
           <span className="text-gray-400 pl-1">🔍</span>
           <input
@@ -275,16 +290,10 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
             className="w-full text-sm outline-none bg-transparent"
           />
           {searchTerm && (
-            <button 
-              onClick={() => setSearchTerm('')}
-              className="text-xs text-gray-400 hover:text-gray-600 font-bold pr-1"
-            >
-              ✕
-            </button>
+            <button onClick={() => setSearchTerm('')} className="text-xs text-gray-400 hover:text-gray-600 font-bold pr-1">✕</button>
           )}
         </div>
 
-        {/* Modell-Akkordeons */}
         {filteredGroupKeys.length === 0 ? (
           <div className="bg-white p-8 rounded-lg shadow-sm border text-center text-gray-500 text-sm">
             Nessun modello trovato per "{searchTerm}".
@@ -339,6 +348,12 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
                       <tbody>
                         {variants.map((v: any) => {
                           const isOut = (v.stock_main || 0) + (v.stock_external || 0) === 0
+                          const currentMainInput = stockInputs[v.id]?.main ?? (v.stock_main || 0)
+                          const currentExtInput = stockInputs[v.id]?.ext ?? (v.stock_external || 0)
+                          const isStockChanged = stockInputs[v.id] && (
+                            stockInputs[v.id].main !== (v.stock_main || 0) ||
+                            stockInputs[v.id].ext !== (v.stock_external || 0)
+                          )
 
                           return (
                             <tr key={v.id} className={`border-b hover:bg-gray-50 ${editingId === v.id ? 'bg-amber-50' : ''} ${isOut ? 'bg-red-50/50' : ''}`}>
@@ -353,17 +368,40 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
                               <td className="p-2 font-semibold">{v.color || '-'}</td>
                               <td className="p-2">{v.length || '-'}</td>
                               <td className="p-2 font-bold">{(v.price_vk || 0).toFixed(2)} €</td>
+                              
+                              {/* Direkte Bearbeitung Magazzino Principale */}
                               <td className="p-2">
-                                <span className={`font-bold ${v.stock_main > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
-                                  {v.stock_main || 0} pz.
-                                </span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={currentMainInput}
+                                  onChange={e => handleStockInputChange(v.id, 'main', parseInt(e.target.value) || 0)}
+                                  className="w-14 p-1 border rounded text-center text-xs font-bold text-emerald-700 bg-emerald-50/50 focus:bg-white"
+                                />
                               </td>
+
+                              {/* Direkte Bearbeitung Magazzino Esterno */}
                               <td className="p-2">
-                                <span className={`font-bold ${v.stock_external > 0 ? 'text-amber-700' : 'text-gray-400'}`}>
-                                  {v.stock_external || 0} pz.
-                                </span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={currentExtInput}
+                                  onChange={e => handleStockInputChange(v.id, 'ext', parseInt(e.target.value) || 0)}
+                                  className="w-14 p-1 border rounded text-center text-xs font-bold text-amber-700 bg-amber-50/50 focus:bg-white"
+                                />
                               </td>
-                              <td className="p-2 text-right space-x-2">
+
+                              <td className="p-2 text-right space-x-1">
+                                {isStockChanged && (
+                                  <button
+                                    onClick={() => handleSaveStock(v)}
+                                    disabled={savingStockId === v.id}
+                                    className="p-1 bg-emerald-600 text-white rounded text-xs font-bold hover:bg-emerald-700"
+                                    title="Salva giacenza"
+                                  >
+                                    💾
+                                  </button>
+                                )}
                                 <button onClick={() => handleEditClick(v, groupKey)} className="p-1 text-slate-600 hover:text-blue-600 text-sm" title="Modifica variante">✏️</button>
                                 <button onClick={() => handleDeleteProduct(v.id)} className="p-1 text-red-500 hover:text-red-700 text-sm" title="Elimina variante">✕</button>
                               </td>
