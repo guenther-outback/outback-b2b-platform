@@ -5,10 +5,12 @@ import { createClient } from '@/lib/supabaseClient'
 
 interface CustomersTabProps {
   customers: any[]
+  availableBrands: string[]
   loadData: () => void
 }
 
-export default function CustomersTab({ customers, loadData }: CustomersTabProps) {
+export default function CustomersTab({ customers, availableBrands, loadData }: CustomersTabProps) {
+  const [editingCustomerId, setEditingEditingCustomerId] = useState<string | null>(null)
   const [newCustomer, setNewCustomer] = useState({
     company_name: '', 
     contact_name: '', 
@@ -16,25 +18,75 @@ export default function CustomersTab({ customers, loadData }: CustomersTabProps)
     address: '', 
     zip_code: '', 
     city: '',
-    is_admin: false
+    is_admin: false,
+    allowed_brands: [] as string[]
   })
 
   const supabase = createClient()
 
-  const handleCreateCustomer = async (e: React.FormEvent) => {
+  const handleBrandToggle = (brand: string) => {
+    setNewCustomer(prev => {
+      const exists = prev.allowed_brands.includes(brand)
+      const updated = exists 
+        ? prev.allowed_brands.filter(b => b !== brand)
+        : [...prev.allowed_brands, brand]
+      return { ...prev, allowed_brands: updated }
+    })
+  }
+
+  const handleCreateOrUpdateCustomer = async (e: React.FormEvent) => {
     e.preventDefault()
-    const { error } = await supabase.from('customers').insert([{
-      ...newCustomer,
-      email: newCustomer.email.trim().toLowerCase(),
-      is_active: true
-    }])
-    if (!error) {
-      alert('Cliente abilitato con successo!')
-      setNewCustomer({ company_name: '', contact_name: '', email: '', address: '', zip_code: '', city: '', is_admin: false })
-      loadData()
+    
+    if (editingCustomerId) {
+      const { error } = await supabase
+        .from('customers')
+        .update({
+          ...newCustomer,
+          email: newCustomer.email.trim().toLowerCase(),
+        })
+        .eq('id', editingCustomerId)
+
+      if (!error) {
+        alert('Cliente aggiornato con successo!')
+        resetForm()
+        loadData()
+      } else {
+        alert('Errore aggiornamento: ' + error.message)
+      }
     } else {
-      alert('Errore registrazione: ' + error.message)
+      const { error } = await supabase.from('customers').insert([{
+        ...newCustomer,
+        email: newCustomer.email.trim().toLowerCase(),
+        is_active: true
+      }])
+
+      if (!error) {
+        alert('Cliente abilitato con successo!')
+        resetForm()
+        loadData()
+      } else {
+        alert('Errore registrazione: ' + error.message)
+      }
     }
+  }
+
+  const handleEditClick = (c: any) => {
+    setEditingEditingCustomerId(c.id)
+    setNewCustomer({
+      company_name: c.company_name || '',
+      contact_name: c.contact_name || '',
+      email: c.email || '',
+      address: c.address || '',
+      zip_code: c.zip_code || '',
+      city: c.city || '',
+      is_admin: !!c.is_admin,
+      allowed_brands: c.allowed_brands || []
+    })
+  }
+
+  const resetForm = () => {
+    setEditingEditingCustomerId(null)
+    setNewCustomer({ company_name: '', contact_name: '', email: '', address: '', zip_code: '', city: '', is_admin: false, allowed_brands: [] })
   }
 
   const handleToggleAdmin = async (customer: any) => {
@@ -49,33 +101,74 @@ export default function CustomersTab({ customers, loadData }: CustomersTabProps)
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <div className="bg-white p-6 rounded-lg shadow-sm border h-fit">
-        <h2 className="font-bold text-lg mb-4 text-gray-800">Abilita Cliente B2B</h2>
-        <form onSubmit={handleCreateCustomer} className="space-y-3 text-sm">
+      {/* Formular per Creazione / Modifica */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 h-fit">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="font-bold text-lg text-gray-800">
+            {editingCustomerId ? 'Modifica Cliente' : 'Abilita Cliente B2B'}
+          </h2>
+          {editingCustomerId && (
+            <button onClick={resetForm} className="text-xs text-red-500 underline font-semibold">
+              Annulla
+            </button>
+          )}
+        </div>
+
+        <form onSubmit={handleCreateOrUpdateCustomer} className="space-y-3 text-sm">
           <div>
-            <label className="block text-xs font-semibold text-gray-600">Ragione Sociale</label>
-            <input type="text" required value={newCustomer.company_name} onChange={e => setNewCustomer({...newCustomer, company_name: e.target.value})} className="w-full p-2 border rounded" />
+            <label className="block text-xs font-semibold text-gray-700">Ragione Sociale</label>
+            <input type="text" required value={newCustomer.company_name} onChange={e => setNewCustomer({...newCustomer, company_name: e.target.value})} className="w-full p-2 border border-gray-300 rounded text-gray-800" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-600">Referente</label>
-            <input type="text" required value={newCustomer.contact_name} onChange={e => setNewCustomer({...newCustomer, contact_name: e.target.value})} className="w-full p-2 border rounded" />
+            <label className="block text-xs font-semibold text-gray-700">Referente</label>
+            <input type="text" required value={newCustomer.contact_name} onChange={e => setNewCustomer({...newCustomer, contact_name: e.target.value})} className="w-full p-2 border border-gray-300 rounded text-gray-800" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-600">E-mail di Login</label>
-            <input type="email" required value={newCustomer.email} onChange={e => setNewCustomer({...newCustomer, email: e.target.value})} className="w-full p-2 border rounded" />
+            <label className="block text-xs font-semibold text-gray-700">E-mail di Login</label>
+            <input type="email" required value={newCustomer.email} onChange={e => setNewCustomer({...newCustomer, email: e.target.value})} className="w-full p-2 border border-gray-300 rounded text-gray-800" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-600">Indirizzo</label>
-            <input type="text" required value={newCustomer.address} onChange={e => setNewCustomer({...newCustomer, address: e.target.value})} className="w-full p-2 border rounded" />
+            <label className="block text-xs font-semibold text-gray-700">Indirizzo</label>
+            <input type="text" required value={newCustomer.address} onChange={e => setNewCustomer({...newCustomer, address: e.target.value})} className="w-full p-2 border border-gray-300 rounded text-gray-800" />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-xs font-semibold text-gray-600">CAP</label>
-              <input type="text" required value={newCustomer.zip_code} onChange={e => setNewCustomer({...newCustomer, zip_code: e.target.value})} className="w-full p-2 border rounded" />
+              <label className="block text-xs font-semibold text-gray-700">CAP</label>
+              <input type="text" required value={newCustomer.zip_code} onChange={e => setNewCustomer({...newCustomer, zip_code: e.target.value})} className="w-full p-2 border border-gray-300 rounded text-gray-800" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-600">Città</label>
-              <input type="text" required value={newCustomer.city} onChange={e => setNewCustomer({...newCustomer, city: e.target.value})} className="w-full p-2 border rounded" />
+              <label className="block text-xs font-semibold text-gray-700">Città</label>
+              <input type="text" required value={newCustomer.city} onChange={e => setNewCustomer({...newCustomer, city: e.target.value})} className="w-full p-2 border border-gray-300 rounded text-gray-800" />
+            </div>
+          </div>
+
+          {/* MARKEN-ZUTEILUNG */}
+          <div className="pt-2 border-t border-gray-200">
+            <label className="block text-xs font-bold text-gray-800 mb-1.5">
+              Marchi Abilitati (Vuoto = Tutti):
+            </label>
+            <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 bg-gray-50 rounded border border-gray-200">
+              {availableBrands.length === 0 ? (
+                <span className="text-xs text-gray-500">Nessun marchio trovato nel catalogo.</span>
+              ) : (
+                availableBrands.map(brand => {
+                  const isSelected = newCustomer.allowed_brands.includes(brand)
+                  return (
+                    <button
+                      key={brand}
+                      type="button"
+                      onClick={() => handleBrandToggle(brand)}
+                      className={`text-xs px-2.5 py-1 rounded-md font-semibold transition border ${
+                        isSelected 
+                          ? 'bg-blue-600 text-white border-blue-600' 
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      {isSelected ? '✓ ' : '+ '}{brand}
+                    </button>
+                  )
+                })
+              )}
             </div>
           </div>
 
@@ -87,55 +180,61 @@ export default function CustomersTab({ customers, loadData }: CustomersTabProps)
                 onChange={e => setNewCustomer({...newCustomer, is_admin: e.target.checked})}
                 className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
               />
-              <span className="text-xs font-bold text-gray-700">Imposta come Utente Admin (Sì / No)</span>
+              <span className="text-xs font-bold text-gray-800">Utente Admin</span>
             </label>
           </div>
 
-          <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded text-sm mt-4">
-            Registra e Abilita Cliente
+          <button type="submit" className={`w-full text-white font-bold py-2 rounded text-sm mt-4 ${editingCustomerId ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'}`}>
+            {editingCustomerId ? 'Salva Modifiche' : 'Registra e Abilita Cliente'}
           </button>
         </form>
       </div>
 
-      <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-sm border overflow-x-auto">
+      {/* Tabella Clienti B2B */}
+      <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
         <h2 className="font-bold text-lg mb-4 text-gray-800">Clienti B2B Abilitati</h2>
         <table className="w-full text-left text-xs">
           <thead>
-            <tr className="bg-gray-100 border-b">
+            <tr className="bg-gray-100 border-b border-gray-200 text-gray-800 font-bold">
               <th className="p-2">Azienda</th>
-              <th className="p-2">Contatto</th>
               <th className="p-2">E-mail</th>
-              <th className="p-2">Città</th>
-              <th className="p-2">Ruolo (Admin)</th>
-              <th className="p-2">Stato</th>
+              <th className="p-2">Marchi Autorizzati</th>
+              <th className="p-2">Ruolo</th>
+              <th className="p-2 text-right">Azione</th>
             </tr>
           </thead>
           <tbody>
             {customers.map(c => (
-              <tr key={c.id} className="border-b hover:bg-gray-50">
-                <td className="p-2 font-bold">{c.company_name}</td>
-                <td className="p-2">{c.contact_name}</td>
-                <td className="p-2 font-mono">{c.email}</td>
-                <td className="p-2">{c.zip_code} {c.city}</td>
+              <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50">
+                <td className="p-2 font-bold text-gray-900">
+                  {c.company_name}
+                  <div className="text-[10px] font-normal text-gray-600">{c.contact_name} ({c.city})</div>
+                </td>
+                <td className="p-2 font-mono text-gray-700">{c.email}</td>
                 <td className="p-2">
-                  <button
-                    onClick={() => handleToggleAdmin(c)}
-                    title="Clicca per cambiare stato"
-                    className="cursor-pointer"
-                  >
+                  {!c.allowed_brands || c.allowed_brands.length === 0 ? (
+                    <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded font-bold">Tutti</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {c.allowed_brands.map((b: string) => (
+                        <span key={b} className="bg-blue-50 text-blue-800 border border-blue-200 text-[10px] px-1.5 py-0.5 rounded font-medium">
+                          {b}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </td>
+                <td className="p-2">
+                  <button onClick={() => handleToggleAdmin(c)} title="Clicca per cambiare">
                     {c.is_admin ? (
-                      <span className="bg-purple-100 text-purple-800 text-[10px] px-2 py-0.5 rounded font-bold hover:bg-purple-200">
-                        👑 Admin (Sì)
-                      </span>
+                      <span className="bg-purple-100 text-purple-800 text-[10px] px-2 py-0.5 rounded font-bold">👑 Admin</span>
                     ) : (
-                      <span className="bg-gray-100 text-gray-600 text-[10px] px-2 py-0.5 rounded font-bold hover:bg-gray-200">
-                        👤 Cliente (No)
-                      </span>
+                      <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded font-bold">👤 Cliente</span>
                     )}
                   </button>
                 </td>
-                <td className="p-2">
-                  <span className="bg-green-100 text-green-800 text-[10px] px-2 py-0.5 rounded font-bold">Attivo</span>
+                <td className="p-2 text-right">
+                  <button onClick={() => handleEditClick(c)} className="p-1 text-slate-600 hover:text-blue-600 text-sm font-bold" title="Modifica cliente">✏️</button>
                 </td>
               </tr>
             ))}

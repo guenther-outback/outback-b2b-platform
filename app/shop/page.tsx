@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabaseClient'
 import { useCart } from '@/context/CartContext'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { useLanguage } from '@/context/LanguageContext'
+import QuantityInput from '@/components/QuantityInput'
 
 export default function ShopPage() {
   const [products, setProducts] = useState<any[]>([])
@@ -17,6 +18,9 @@ export default function ShopPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [orderSuccess, setOrderSuccess] = useState(false)
   const [orderNote, setOrderNote] = useState('')
+
+  // State für die freigeschalteten Marken des Kunden
+  const [allowedBrands, setAllowedBrands] = useState<string[] | null>(null)
 
   const { t } = useLanguage()
   
@@ -56,11 +60,18 @@ export default function ShopPage() {
       
       const { data: customer } = await supabase
         .from('customers')
-        .select('is_admin')
+        .select('is_admin, allowed_brands')
         .eq('email', user.email.trim().toLowerCase())
         .single()
       
-      if (customer?.is_admin) setIsAdmin(true)
+      if (customer) {
+        if (customer.is_admin) setIsAdmin(true)
+        if (customer.allowed_brands && customer.allowed_brands.length > 0) {
+          setAllowedBrands(customer.allowed_brands)
+        } else {
+          setAllowedBrands(null)
+        }
+      }
     }
 
     const { data, error } = await supabase
@@ -78,10 +89,12 @@ export default function ShopPage() {
     fetchProducts()
   }, [])
 
-  // 1. Nur Produkte mit tatsächlichem Restbestand (> 0) berücksichtigen
-  const availableProducts = products.filter(
-    (p) => getEffectiveStock(p).total > 0
-  )
+  // 1. Nur Produkte mit Bestand & erlaubter Marke berücksichtigen
+  const availableProducts = products.filter((p) => {
+    const hasStock = getEffectiveStock(p).total > 0
+    const isBrandAllowed = !allowedBrands || (p.brand && allowedBrands.includes(p.brand))
+    return hasStock && isBrandAllowed
+  })
 
   // 2. Gruppierung streng nach Titel/Beschreibung (sowie Marke)
   const getGroupKey = (product: any) => {
@@ -119,7 +132,6 @@ export default function ShopPage() {
     const selectedLength = selectedLengths[groupKey]
     const quantityToAdd = selectedQuantities[groupKey] || 1
     
-    // Passende Variante für gewählte Farbe & Länge finden
     const productVariant = group.find(
       p => (selectedColor ? p.color === selectedColor : true) && 
            (selectedLength ? p.length === selectedLength : true)
@@ -193,26 +205,24 @@ export default function ShopPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-    {/* Moderner, schlichter B2B Header */}
+      {/* Header */}
       <header className="bg-slate-900/95 backdrop-blur-md text-slate-100 sticky top-0 z-30 border-b border-slate-800/80 shadow-sm transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
           
-          {/* Branding & Status */}
           <div className="flex items-center gap-3 min-w-0">
             <a href="/shop" className="text-base sm:text-lg font-semibold tracking-tight text-white hover:opacity-90 transition">
-              OUTBACK <span className="text-xs font-normal text-slate-400 uppercase tracking-widest ml-1">B2B</span>
+              OUTBACK <span className="text-xs font-normal text-slate-300 uppercase tracking-widest ml-1">B2B</span>
             </a>
             {userEmail && (
               <>
                 <span className="hidden sm:inline text-slate-700">|</span>
-                <span className="hidden sm:inline text-xs text-slate-400 truncate max-w-[200px]" title={userEmail}>
+                <span className="hidden sm:inline text-xs text-slate-300 font-medium truncate max-w-[200px]" title={userEmail}>
                   {userEmail}
                 </span>
               </>
             )}
           </div>
 
-          {/* Actions & Navigation */}
           <div className="flex items-center gap-2 sm:gap-3">
             <LanguageSwitcher />
 
@@ -227,7 +237,6 @@ export default function ShopPage() {
               </a>
             )}
 
-            {/* Warenkorb Button */}
             <button
               onClick={() => setIsCartOpen(true)}
               className="relative text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 shadow-sm"
@@ -243,10 +252,9 @@ export default function ShopPage() {
               )}
             </button>
 
-            {/* Abmelden Icon/Link */}
             <button 
               onClick={handleLogout} 
-              className="text-xs text-slate-400 hover:text-slate-200 transition-colors p-1 ml-1"
+              className="text-xs text-slate-300 hover:text-slate-200 transition-colors p-1 ml-1"
               title={t('shop.logout')}
             >
               <svg className="w-4 h-4 sm:hidden" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -268,13 +276,13 @@ export default function ShopPage() {
             placeholder={t('shop.search_placeholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full md:w-1/2 p-2 border border-gray-300 rounded-md text-sm"
+            className="w-full md:w-1/2 p-2 border border-gray-300 rounded-md text-sm text-gray-800"
           />
 
           <select
             value={selectedBrand}
             onChange={(e) => setSelectedBrand(e.target.value)}
-            className="w-full md:w-1/4 p-2 border border-gray-300 rounded-md text-sm"
+            className="w-full md:w-1/4 p-2 border border-gray-300 rounded-md text-sm text-gray-800"
           >
             <option value="">{t('shop.all_brands')}</option>
             {brands.map((b) => (
@@ -285,23 +293,21 @@ export default function ShopPage() {
 
         {/* Produkte Grid */}
         {loading ? (
-          <p className="text-center py-12 text-gray-500">...</p>
+          <p className="text-center py-12 text-gray-600 font-medium">...</p>
         ) : groupedKeys.length === 0 ? (
-          <p className="text-center py-12 text-gray-500">Keine verfügbaren Artikel gefunden.</p>
+          <p className="text-center py-12 text-gray-600 font-medium">Keine verfügbaren Artikel gefunden.</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {groupedKeys.map((groupKey) => {
               const group = groupedProducts[groupKey]
               const mainItem = group[0]
 
-              // 1. Verfügbare Farben ermitteln
               const availableColors = Array.from(
                 new Set(group.map(p => p.color).filter(Boolean))
               ) as string[]
 
               const currentColor = selectedColors[groupKey] || availableColors[0] || ''
 
-              // 2. Verfügbare Längen basierend auf der gewählten Farbe ermitteln
               const colorFilteredGroup = group.filter(
                 p => !currentColor || p.color === currentColor
               )
@@ -317,7 +323,6 @@ export default function ShopPage() {
 
               const currentLength = selectedLengths[groupKey] || availableLengths[0] || ''
 
-              // Aktive Variante auflösen
               const activeVariant = group.find(
                 p => (currentColor ? p.color === currentColor : true) &&
                      (currentLength ? p.length === currentLength : true)
@@ -336,7 +341,7 @@ export default function ShopPage() {
                         className="w-full h-full object-contain p-4"
                       />
                     ) : (
-                      <div className="text-gray-400 text-xs flex flex-col items-center gap-1">
+                      <div className="text-gray-600 text-xs font-semibold flex flex-col items-center gap-1">
                         <span>📷 Kein Bild für diese Farbe</span>
                       </div>
                     )}
@@ -347,16 +352,16 @@ export default function ShopPage() {
                     <div>
                       <div className="flex justify-between items-start mb-1">
                         <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">{mainItem.brand}</span>
-                        <span className="text-xs text-gray-400">SKU: {activeVariant.sku}</span>
+                        <span className="text-xs text-gray-600 font-medium">SKU: {activeVariant.sku}</span>
                       </div>
                       <h3 className="font-bold text-gray-800 text-lg mb-3">{mainItem.title}</h3>
                       
                       {/* VARIANTEN AUSWAHL: FARBE & LÄNGE */}
                       <div className="space-y-3 mb-4">
-                        {/* Farbauswahl Dropdown */}
-                        {availableColors.length > 0 && (
+                        {/* Farbauswahl: Nur Dropdown wenn > 1 Farbe, sonst elegantes Text-Badge */}
+                        {availableColors.length > 1 ? (
                           <div>
-                            <label className="block text-xs font-semibold text-gray-600 mb-1">
+                            <label className="block text-xs font-bold text-gray-800 mb-1">
                               {t('shop.select_color') || 'Farbe wählen:'}
                             </label>
                             <select
@@ -365,31 +370,37 @@ export default function ShopPage() {
                                 const newColor = e.target.value
                                 setSelectedColors({ ...selectedColors, [groupKey]: newColor })
                                 
-                                // Erste verfügbare Länge dieser Farbe automatisch wählen
                                 const nextGroup = group.filter(p => p.color === newColor && getEffectiveStock(p).total > 0)
                                 if (nextGroup.length > 0) {
                                   setSelectedLengths({ ...selectedLengths, [groupKey]: nextGroup[0].length })
                                 }
                               }}
-                              className="w-full p-2 border border-gray-300 rounded text-sm bg-gray-50 focus:bg-white font-medium"
+                              className="w-full p-2 border border-gray-300 rounded text-sm bg-gray-50 focus:bg-white font-medium text-gray-800"
                             >
                               {availableColors.map((color) => (
                                 <option key={color} value={color}>{color}</option>
                               ))}
                             </select>
                           </div>
-                        )}
+                        ) : availableColors.length === 1 && availableColors[0] !== '' ? (
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="font-bold text-gray-700">{t('shop.select_color') || 'Farbe:'}</span>
+                            <span className="bg-gray-100 border border-gray-200 text-gray-800 font-semibold px-2.5 py-1 rounded-md">
+                              {availableColors[0]}
+                            </span>
+                          </div>
+                        ) : null}
 
-                        {/* Längenauswahl Dropdown */}
-                        {availableLengths.length > 0 && (
+                        {/* Längenauswahl: Nur Dropdown wenn > 1 Länge, sonst elegantes Text-Badge */}
+                        {availableLengths.length > 1 ? (
                           <div>
-                            <label className="block text-xs font-semibold text-gray-600 mb-1">
+                            <label className="block text-xs font-bold text-gray-800 mb-1">
                               {t('shop.select_length')}:
                             </label>
                             <select
                               value={currentLength}
                               onChange={(e) => setSelectedLengths({ ...selectedLengths, [groupKey]: e.target.value })}
-                              className="w-full p-2 border border-gray-300 rounded text-sm bg-gray-50 focus:bg-white font-medium"
+                              className="w-full p-2 border border-gray-300 rounded text-sm bg-gray-50 focus:bg-white font-medium text-gray-800"
                             >
                               {availableLengths.map((len) => {
                                 const variant = colorFilteredGroup.find(p => p.length === len)
@@ -404,11 +415,18 @@ export default function ShopPage() {
                               })}
                             </select>
                           </div>
-                        )}
+                        ) : availableLengths.length === 1 && availableLengths[0] !== '' ? (
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="font-bold text-gray-700">{t('shop.select_length')}:</span>
+                            <span className="bg-gray-100 border border-gray-200 text-gray-800 font-semibold px-2.5 py-1 rounded-md">
+                              {availableLengths[0]}
+                            </span>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
 
-                    {/* Detaillierter Lieferzeit-Status */}
+                    {/* Lieferzeit-Status */}
                     <div className="mb-4 text-xs">
                       {effectiveStock.stockMain > 0 ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-medium">
@@ -421,10 +439,10 @@ export default function ShopPage() {
                       ) : null}
                     </div>
 
-                    <div className="border-t pt-4 flex justify-between items-end mt-2">
+                    <div className="border-t pt-4 flex justify-between items-end gap-2 mt-2">
                       <div>
                         {activeVariant.price_vk > 0 && (
-                          <div className="text-[11px] font-medium text-gray-500">
+                          <div className="text-[11px] font-semibold text-gray-700">
                             {t('shop.price_uvp') || 'UVP'}: {activeVariant.price_vk.toFixed(2)} €
                           </div>
                         )}
@@ -438,25 +456,22 @@ export default function ShopPage() {
                       </div>
                       
                       <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          min="1"
-                          max={effectiveStock.total}
+                        <QuantityInput
                           value={selectedQuantities[groupKey] || 1}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value) || 1
-                            const clampedVal = Math.min(Math.max(1, val), Math.max(1, effectiveStock.total))
-                            
+                          min={1}
+                          max={effectiveStock.total}
+                          disabled={effectiveStock.total <= 0}
+                          onChange={(newQty) => {
                             setSelectedQuantities({
                               ...selectedQuantities,
-                              [groupKey]: clampedVal,
+                              [groupKey]: newQty,
                             })
                           }}
-                          className="w-14 p-1.5 border border-gray-300 rounded text-center text-sm font-semibold bg-gray-50 focus:bg-white"
                         />
+
                         <button
                           onClick={() => handleAddToCart(groupKey)}
-                          className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded text-sm font-medium transition"
+                          className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded text-sm font-medium transition shrink-0"
                         >
                           {t('shop.add_to_cart')}
                         </button>
@@ -476,8 +491,8 @@ export default function ShopPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-end">
           <div className="bg-white w-full max-w-md h-full flex flex-col p-6 shadow-xl">
             <div className="flex justify-between items-center border-b pb-4 mb-4">
-              <h2 className="text-lg font-bold">{t('shop.cart')}</h2>
-              <button onClick={() => { setIsCartOpen(false); setOrderSuccess(false); }} className="text-gray-500 hover:text-black">✕</button>
+              <h2 className="text-lg font-bold text-gray-900">{t('shop.cart')}</h2>
+              <button onClick={() => { setIsCartOpen(false); setOrderSuccess(false); }} className="text-gray-600 hover:text-black">✕</button>
             </div>
 
             {orderSuccess ? (
@@ -496,7 +511,7 @@ export default function ShopPage() {
               <>
                 <div className="flex-1 overflow-y-auto space-y-4">
                   {cart.length === 0 ? (
-                    <p className="text-gray-400 text-center py-8">{t('shop.empty_cart')}</p>
+                    <p className="text-gray-600 font-medium text-center py-8">{t('shop.empty_cart')}</p>
                   ) : (
                     cart.map((item) => {
                       const itemEkPrice = item.price_ek || item.price_vk || 0
@@ -508,10 +523,10 @@ export default function ShopPage() {
                       const extQty = Math.max(0, qty - mainQty)
 
                       return (
-                        <div key={item.id} className="flex justify-between items-center border-b pb-3">
+                        <div key={item.id} className="flex justify-between items-center border-b pb-3 gap-2">
                           <div>
-                            <div className="font-bold text-sm">{item.brand} - {item.title}</div>
-                            <div className="text-xs text-gray-500">
+                            <div className="font-bold text-sm text-gray-900">{item.brand} - {item.title}</div>
+                            <div className="text-xs text-gray-600 font-medium">
                               SKU: {item.sku} {item.color && `| ${item.color}`} {item.length && `| ${item.length}`}
                             </div>
 
@@ -534,25 +549,21 @@ export default function ShopPage() {
                             </div>
 
                             <div className="text-xs text-blue-600 font-bold mt-0.5">
-                              {itemEkPrice.toFixed(2)} € <span className="text-gray-400 font-normal">{t('shop.cart_unit_price')}</span>
+                              {itemEkPrice.toFixed(2)} € <span className="text-gray-600 font-normal">{t('shop.cart_unit_price')}</span>
                               <span className="text-gray-700 font-bold ml-2">({t('shop.cart_subtotal')} {itemSubtotal.toFixed(2)} €)</span>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              min="1"
+                          <div className="flex items-center gap-2 shrink-0">
+                            <QuantityInput
                               value={item.quantity || 1}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value, 10)
-                                updateQuantity(item.id, isNaN(val) ? 1 : val)
-                              }}
-                              className="w-12 p-1 border text-center rounded text-sm font-semibold bg-gray-50 focus:bg-white"
+                              min={1}
+                              onChange={(newQty) => updateQuantity(item.id, newQty)}
                             />
+
                             <button 
                               onClick={() => removeFromCart(item.id)} 
-                              className="text-red-500 text-xs hover:underline p-1"
+                              className="text-red-500 text-xs hover:underline p-1 font-bold"
                               title={t('shop.cart_remove_item')}
                             >
                               ✕
@@ -575,11 +586,11 @@ export default function ShopPage() {
                         value={orderNote}
                         onChange={(e) => setOrderNote(e.target.value)}
                         placeholder={t('shop.cart_note_placeholder')}
-                        className="w-full p-2 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500"
+                        className="w-full p-2 border border-gray-300 rounded text-xs text-gray-800 focus:ring-1 focus:ring-blue-500"
                       />
                     </div>
 
-                    <div className="flex justify-between text-lg font-bold">
+                    <div className="flex justify-between text-lg font-bold text-gray-900">
                       <span>{t('shop.total')}:</span>
                       <span>{totalAmount.toFixed(2)} €</span>
                     </div>

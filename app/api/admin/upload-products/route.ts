@@ -9,13 +9,50 @@ const supabaseAdmin = createClient(
 
 export async function POST(request: Request) {
   try {
-    const { products } = await request.json()
+    const { products, mode } = await request.json()
 
     if (!products || !Array.isArray(products)) {
       return NextResponse.json({ error: 'Dati prodotti non validi' }, { status: 400 })
     }
 
-    // 1. Bilder verarbeiten & hochladen
+    // A) REINER BESTANDS-UPDATE (nur SKU, stock_main, stock_external)
+    if (mode === 'stock_only') {
+      const updates = products.map((p: any) => ({
+        sku: (p.sku || '').trim(),
+        length: (p.length || '').trim(),
+        stock_main: parseInt(p.stock_main) || 0,
+        stock_external: parseInt(p.stock_external) || 0,
+      }))
+
+      // Duplikate im selben File filtern
+      const uniqueStockMap = new Map<string, any>()
+      for (const item of updates) {
+        const key = `${item.sku.toLowerCase()}_${item.length.toLowerCase()}`
+        uniqueStockMap.set(key, item)
+      }
+      const deduplicatedStock = Array.from(uniqueStockMap.values())
+
+      for (const item of deduplicatedStock) {
+        let query = supabaseAdmin
+          .from('products')
+          .update({
+            stock_main: item.stock_main,
+            stock_external: item.stock_external,
+          })
+          .eq('sku', item.sku)
+
+        if (item.length) {
+          query = query.eq('length', item.length)
+        }
+
+        const { error } = await query
+        if (error) console.error(`Fehler bei SKU ${item.sku}:`, error.message)
+      }
+
+      return NextResponse.json({ success: true, count: deduplicatedStock.length })
+    }
+
+    // B) VOLLSTÄNDIGER IMPORT (Produkte + Bilder + Bestände)
     const processedProducts = await Promise.all(
       products.map(async (p: any) => {
         let imageUrl = p.image_url
@@ -32,25 +69,19 @@ export async function POST(request: Request) {
       })
     )
 
-    // 2. DUPLIKATE ENTFERNEN: Falls die gleiche SKU + Länge mehrfach in der Excel vorhanden ist,
-    // behalten wir nur den letzten Eintrag, um den Postgres 21000 Fehler zu verhindern.
     const uniqueProductsMap = new Map<string, any>()
-
     for (const prod of processedProducts) {
-      // Eindeutiger Schlüssel aus SKU und Länge (oder nur SKU)
       const uniqueKey = `${(prod.sku || '').trim().toLowerCase()}_${(prod.length || '').trim().toLowerCase()}`
       uniqueProductsMap.set(uniqueKey, prod)
     }
 
     const deduplicatedProducts = Array.from(uniqueProductsMap.values())
 
-    // 3. Upsert in Supabase ausführen
     const { error } = await supabaseAdmin
       .from('products')
       .upsert(deduplicatedProducts, { onConflict: 'sku,length' })
 
     if (error) {
-      // Falls der Constraint in Supabase nur auf 'sku' liegt, versuchen wir es mit 'sku'
       if (error.message.includes('onConflict') || error.code === '42704') {
         const { error: fallbackError } = await supabaseAdmin
           .from('products')

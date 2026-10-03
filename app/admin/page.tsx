@@ -12,6 +12,9 @@ export default function AdminDashboard() {
   const [customers, setCustomers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
+  // In app/admin/page.tsx beim Einbinden des Kunden-Tabs:
+  const availableBrands = Array.from(new Set(products.map(p => p.brand).filter(Boolean))) as string[]
+
   const supabase = createClient()
 
   useEffect(() => { loadData() }, [])
@@ -77,7 +80,7 @@ export default function AdminDashboard() {
               <ProductTab products={products} groupedProducts={groupedProducts} loadData={loadData} />
             )}
             {activeTab === 'customers' && (
-              <CustomersTab customers={customers} loadData={loadData} />
+              <CustomersTab customers={customers} availableBrands={availableBrands} loadData={loadData} />
             )}
             {activeTab === 'upload' && (
               <UploadTab products={products} loadData={loadData} />

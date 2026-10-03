@@ -9,6 +9,7 @@ interface UploadTabProps {
 }
 
 export default function UploadTab({ products, loadData }: UploadTabProps) {
+  const [importMode, setImportMode] = useState<'full' | 'stock_only'>('stock_only')
   const [uploadStatus, setUploadStatus] = useState('')
   const [isUploading, setIsUploading] = useState(false)
   const [previewData, setPreviewData] = useState<any[]>([])
@@ -34,9 +35,37 @@ export default function UploadTab({ products, loadData }: UploadTabProps) {
     return result
   }
 
+  // Modello Excel scaricabile (3 Spalten für Giacenze)
   const downloadTemplate = async () => {
-    const templateData = [
-      {
+    const workbook = new ExcelJS.Workbook()
+    const worksheet = workbook.addWorksheet('Modello_Importazione')
+
+    if (importMode === 'stock_only') {
+      worksheet.columns = [
+        { header: 'SKU', key: 'SKU', width: 22 },
+        { header: 'GiacenzaPrincipale', key: 'GiacenzaPrincipale', width: 20 },
+        { header: 'GiacenzaEsterna', key: 'GiacenzaEsterna', width: 20 }
+      ]
+      worksheet.addRow({
+        SKU: 'SK-AT-G9-173',
+        GiacenzaPrincipale: 15,
+        GiacenzaEsterna: 5
+      })
+    } else {
+      worksheet.columns = [
+        { header: 'SKU', key: 'SKU', width: 15 },
+        { header: 'Marca', key: 'Marca', width: 15 },
+        { header: 'Categoria', key: 'Categoria', width: 15 },
+        { header: 'Titolo', key: 'Titolo', width: 25 },
+        { header: 'Lunghezza', key: 'Lunghezza', width: 12 },
+        { header: 'Colore', key: 'Colore', width: 12 },
+        { header: 'PrezzoEK', key: 'PrezzoEK', width: 12 },
+        { header: 'PrezzoVK', key: 'PrezzoVK', width: 12 },
+        { header: 'GiacenzaPrincipale', key: 'GiacenzaPrincipale', width: 18 },
+        { header: 'GiacenzaEsterna', key: 'GiacenzaEsterna', width: 18 },
+        { header: 'Immagine', key: 'Immagine', width: 25 }
+      ]
+      worksheet.addRow({
         SKU: 'SK-AT-G9-173',
         Marca: 'Atomic',
         Categoria: 'Skis',
@@ -48,34 +77,15 @@ export default function UploadTab({ products, loadData }: UploadTabProps) {
         GiacenzaPrincipale: 10,
         GiacenzaEsterna: 5,
         Immagine: ''
-      }
-    ]
-
-    const workbook = new ExcelJS.Workbook()
-    const worksheet = workbook.addWorksheet('Modello_Prodotti')
-
-    worksheet.columns = [
-      { header: 'SKU', key: 'SKU', width: 15 },
-      { header: 'Marca', key: 'Marca', width: 15 },
-      { header: 'Categoria', key: 'Categoria', width: 15 },
-      { header: 'Titolo', key: 'Titolo', width: 25 },
-      { header: 'Lunghezza', key: 'Lunghezza', width: 12 },
-      { header: 'Colore', key: 'Colore', width: 12 },
-      { header: 'PrezzoEK', key: 'PrezzoEK', width: 12 },
-      { header: 'PrezzoVK', key: 'PrezzoVK', width: 12 },
-      { header: 'GiacenzaPrincipale', key: 'GiacenzaPrincipale', width: 18 },
-      { header: 'GiacenzaEsterna', key: 'GiacenzaEsterna', width: 18 },
-      { header: 'Immagine', key: 'Immagine', width: 25 }
-    ]
-
-    templateData.forEach(item => worksheet.addRow(item))
+      })
+    }
 
     const buffer = await workbook.xlsx.writeBuffer()
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'Outback_B2B_Modello_Prodotti.xlsx'
+    a.download = importMode === 'stock_only' ? 'Outback_Modello_Giacenze_SKU.xlsx' : 'Outback_Modello_Prodotti_Completo.xlsx'
     a.click()
     window.URL.revokeObjectURL(url)
   }
@@ -125,29 +135,49 @@ export default function UploadTab({ products, loadData }: UploadTabProps) {
         })
       }
 
-      const parsed = rawData.map((row: any) => {
-        const sku = String(row.SKU || row.sku || '').trim()
-        const length = String(row.Lunghezza || row.Länge || row.length || '').trim()
-        const exists = products.some(p => p.sku === sku && (p.length || '') === length)
+      if (importMode === 'stock_only') {
+        // Nur SKU, stock_main und stock_external verarbeiten
+        const parsed = rawData.map((row: any) => {
+          const sku = String(row.SKU || row.sku || '').trim()
+          const existingProduct = products.find(p => p.sku.toLowerCase() === sku.toLowerCase())
 
-        return {
-          sku,
-          brand: String(row.Marca || row.Marke || row.brand || '').trim(),
-          category: String(row.Categoria || row.Kategorie || 'Skis').trim(),
-          title: String(row.Titolo || row.Titel || row.title || '').trim(),
-          length,
-          color: String(row.Colore || row.Farbe || row.color || '').trim(),
-          price_ek: parseFloat(row.PrezzoEK || row.EK || 0) || 0,
-          price_vk: parseFloat(row.PrezzoVK || row.VK || 0) || 0,
-          stock_main: parseInt(row.GiacenzaPrincipale || row.BestandHauptlager || 0) || 0,
-          stock_external: parseInt(row.GiacenzaEsterna || row.BestandAussenlager || 0) || 0,
-          image_url: row.Immagine || row.Bild || null,
-          isUpdate: exists
-        }
-      }).filter(item => item.sku !== '')
+          return {
+            sku,
+            title: existingProduct?.title || '',
+            brand: existingProduct?.brand || '',
+            stock_main: parseInt(row.GiacenzaPrincipale || row.BestandHauptlager || 0) || 0,
+            stock_external: parseInt(row.GiacenzaEsterna || row.BestandAussenlager || 0) || 0,
+            exists: !!existingProduct
+          }
+        }).filter(item => item.sku !== '')
 
-      setPreviewData(parsed)
-      setUploadStatus(`${parsed.length} prodotti pronti per l'anteprima.`)
+        setPreviewData(parsed)
+        setUploadStatus(`${parsed.length} aggiornamenti giacenza pronti per l'anteprima.`)
+      } else {
+        const parsed = rawData.map((row: any) => {
+          const sku = String(row.SKU || row.sku || '').trim()
+          const length = String(row.Lunghezza || row.Länge || row.length || '').trim()
+          const exists = products.some(p => p.sku === sku && (p.length || '') === length)
+
+          return {
+            sku,
+            brand: String(row.Marca || row.Marke || row.brand || '').trim(),
+            category: String(row.Categoria || row.Kategorie || 'Skis').trim(),
+            title: String(row.Titolo || row.Titel || row.title || '').trim(),
+            length,
+            color: String(row.Colore || row.Farbe || row.color || '').trim(),
+            price_ek: parseFloat(row.PrezzoEK || row.EK || 0) || 0,
+            price_vk: parseFloat(row.PrezzoVK || row.VK || 0) || 0,
+            stock_main: parseInt(row.GiacenzaPrincipale || row.BestandHauptlager || 0) || 0,
+            stock_external: parseInt(row.GiacenzaEsterna || row.BestandAussenlager || 0) || 0,
+            image_url: row.Immagine || row.Bild || null,
+            isUpdate: exists
+          }
+        }).filter(item => item.sku !== '')
+
+        setPreviewData(parsed)
+        setUploadStatus(`${parsed.length} prodotti pronti per l'anteprima.`)
+      }
     } catch (err: any) {
       setUploadStatus('Errore: ' + err.message)
     }
@@ -159,13 +189,14 @@ export default function UploadTab({ products, loadData }: UploadTabProps) {
     setIsUploading(true)
     setUploadStatus('Caricamento nel database...')
 
-    const dataToUpload = previewData.map(({ isUpdate, ...item }) => item)
-
     try {
       const res = await fetch('/api/admin/upload-products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ products: dataToUpload }),
+        body: JSON.stringify({ 
+          products: previewData,
+          mode: importMode 
+        }),
       })
 
       const result = await res.json()
@@ -173,7 +204,7 @@ export default function UploadTab({ products, loadData }: UploadTabProps) {
       if (!res.ok) {
         setUploadStatus('Errore: ' + result.error)
       } else {
-        setUploadStatus(`🎉 Importati ${dataToUpload.length} prodotti!`)
+        setUploadStatus(`🎉 Aggiornati con successo ${result.count} articoli!`)
         setPreviewData([])
         loadData()
       }
@@ -186,24 +217,61 @@ export default function UploadTab({ products, loadData }: UploadTabProps) {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 rounded-lg shadow-sm border flex flex-col md:flex-row justify-between items-center gap-4">
+      {/* Modus Auswählen */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <h2 className="font-bold text-lg text-gray-800 mb-2">Seleziona Tipo di Importazione</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <label className={`p-4 border rounded-lg cursor-pointer transition flex items-start gap-3 ${importMode === 'stock_only' ? 'border-blue-600 bg-blue-50/50' : 'border-gray-200 hover:bg-gray-50'}`}>
+            <input
+              type="radio"
+              name="importMode"
+              checked={importMode === 'stock_only'}
+              onChange={() => { setImportMode('stock_only'); setPreviewData([]); }}
+              className="mt-1 text-blue-600 focus:ring-blue-500"
+            />
+            <div>
+              <span className="font-bold text-sm text-gray-900 block">📦 Solo Aggiornamento Giacenze (3 colonne)</span>
+              <span className="text-xs text-gray-600">Aggiorna velocemente le quantità di Magazzino usando solo <strong>SKU</strong>, <strong>GiacenzaPrincipale</strong> e <strong>GiacenzaEsterna</strong>.</span>
+            </div>
+          </label>
+
+          <label className={`p-4 border rounded-lg cursor-pointer transition flex items-start gap-3 ${importMode === 'full' ? 'border-blue-600 bg-blue-50/50' : 'border-gray-200 hover:bg-gray-50'}`}>
+            <input
+              type="radio"
+              name="importMode"
+              checked={importMode === 'full'}
+              onChange={() => { setImportMode('full'); setPreviewData([]); }}
+              className="mt-1 text-blue-600 focus:ring-blue-500"
+            />
+            <div>
+              <span className="font-bold text-sm text-gray-900 block">🛍️ Importazione Completa Prodotti</span>
+              <span className="text-xs text-gray-600">Crea o aggiorna prodotti con tutti i dettagli: Marca, Titolo, Prezzi, Colori, Misure e Immagini.</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      {/* Upload Box & Template Download */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
-          <h2 className="font-bold text-lg text-gray-800">Importazione Excel / CSV</h2>
-          <p className="text-xs text-gray-500">Carica nuovi elenchi prodotti o aggiorna le giacenze in pochi secondi.</p>
+          <h3 className="font-bold text-base text-gray-800">
+            {importMode === 'stock_only' ? 'Carica File Giacenze (SKU + Giacenze)' : 'Carica File Prodotti Completo'}
+          </h3>
+          <p className="text-xs text-gray-600">Formati supportati: Excel (.xlsx) oppure CSV.</p>
         </div>
 
         <button
           onClick={downloadTemplate}
-          className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-4 py-2 rounded flex items-center gap-2 transition"
+          className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition"
         >
-          📥 Scarica Modello Excel
+          📥 Scarica Modello {importMode === 'stock_only' ? 'Giacenze (3 col.)' : 'Completo'}
         </button>
       </div>
 
-      <div className="bg-white p-8 rounded-lg shadow-sm border text-center">
-        <div className="border-2 dashed border-blue-200 bg-blue-50/50 p-8 rounded-lg flex flex-col items-center justify-center">
+      <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 text-center">
+        <div className="border-2 dashed border-blue-200 bg-blue-50/40 p-8 rounded-lg flex flex-col items-center justify-center">
           <span className="text-3xl mb-2">📁</span>
-          <p className="text-sm font-semibold text-gray-700 mb-2">Seleziona qui un file Excel (.xlsx) o CSV</p>
+          <p className="text-sm font-semibold text-gray-700 mb-2">Seleziona un file Excel o CSV per l'anteprima</p>
           <input
             type="file"
             accept=".xlsx, .xls, .csv"
@@ -213,31 +281,32 @@ export default function UploadTab({ products, loadData }: UploadTabProps) {
         </div>
 
         {uploadStatus && (
-          <div className="mt-4 p-3 bg-blue-50 text-blue-800 rounded text-xs font-semibold border border-blue-200">
+          <div className="mt-4 p-3 bg-blue-50 text-blue-800 rounded-lg text-xs font-semibold border border-blue-200">
             {uploadStatus}
           </div>
         )}
       </div>
 
+      {/* Preview Tabella */}
       {previewData.length > 0 && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border space-y-4">
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="font-bold text-md text-gray-800">
-              Anteprima Importazione ({previewData.length} articoli)
+              Anteprima ({previewData.length} righe)
             </h3>
             <div className="flex gap-2">
               <button
                 onClick={() => setPreviewData([])}
-                className="px-3 py-1.5 text-xs text-gray-500 hover:underline"
+                className="px-3 py-1.5 text-xs text-gray-600 hover:underline font-medium"
               >
                 Annulla
               </button>
               <button
                 onClick={handleConfirmUpload}
                 disabled={isUploading}
-                className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs px-4 py-2 rounded transition disabled:opacity-50"
+                className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition disabled:opacity-50"
               >
-                {isUploading ? 'Importazione...' : '✅ Conferma e Importa Ora'}
+                {isUploading ? 'Importazione...' : '✅ Conferma e Aggiorna Ora'}
               </button>
             </div>
           </div>
@@ -245,32 +314,50 @@ export default function UploadTab({ products, loadData }: UploadTabProps) {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-gray-100 border-b text-gray-600">
-                  <th className="p-2">Azione</th>
+                <tr className="bg-gray-100 border-b border-gray-200 text-gray-800 font-bold">
+                  <th className="p-2">Stato</th>
                   <th className="p-2">SKU</th>
-                  <th className="p-2">Marca & Titolo</th>
-                  <th className="p-2">Colore</th>
-                  <th className="p-2">Lunghezza</th>
-                  <th className="p-2">Prezzo VK (€)</th>
-                  <th className="p-2">Mag. Principale</th>
-                  <th className="p-2">Mag. Esterno</th>
+                  {importMode === 'full' ? (
+                    <>
+                      <th className="p-2">Lunghezza</th>
+                      <th className="p-2">Marca & Titolo</th>
+                    </>
+                  ) : (
+                    <th className="p-2">Articolo Trovato</th>
+                  )}
+                  <th className="p-2 text-emerald-700">Nuova Giac. Princ.</th>
+                  <th className="p-2 text-amber-700">Nuova Giac. Esterna</th>
                 </tr>
               </thead>
               <tbody>
                 {previewData.map((item, idx) => (
-                  <tr key={idx} className="border-b hover:bg-gray-50">
+                  <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="p-2">
-                      {item.isUpdate ? (
-                        <span className="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded font-bold">Aggiorna</span>
+                      {importMode === 'stock_only' ? (
+                        item.exists ? (
+                          <span className="bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded font-bold">Trovato</span>
+                        ) : (
+                          <span className="bg-red-100 text-red-800 text-[10px] px-2 py-0.5 rounded font-bold">Non Trovato</span>
+                        )
                       ) : (
-                        <span className="bg-green-100 text-green-800 text-[10px] px-2 py-0.5 rounded font-bold">Nuovo</span>
+                        item.isUpdate ? (
+                          <span className="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded font-bold">Aggiorna</span>
+                        ) : (
+                          <span className="bg-green-100 text-green-800 text-[10px] px-2 py-0.5 rounded font-bold">Nuovo</span>
+                        )
                       )}
                     </td>
-                    <td className="p-2 font-mono font-bold">{item.sku}</td>
-                    <td className="p-2"><strong>{item.brand}</strong> {item.title}</td>
-                    <td className="p-2">{item.color || '-'}</td>
-                    <td className="p-2">{item.length || '-'}</td>
-                    <td className="p-2 font-bold">{item.price_vk.toFixed(2)} €</td>
+                    <td className="p-2 font-mono font-bold text-gray-800">{item.sku}</td>
+                    {importMode === 'full' ? (
+                      <>
+                        <td className="p-2 text-gray-700">{item.length || '-'}</td>
+                        <td className="p-2"><strong>{item.brand}</strong> {item.title}</td>
+                      </>
+                    ) : (
+                      <td className="p-2 text-gray-600">
+                        {item.exists ? `${item.brand} ${item.title}` : <em className="text-red-500">SKU non presente nel sistema</em>}
+                      </td>
+                    )}
                     <td className="p-2 text-emerald-700 font-bold">{item.stock_main} pz.</td>
                     <td className="p-2 text-amber-700 font-bold">{item.stock_external} pz.</td>
                   </tr>
