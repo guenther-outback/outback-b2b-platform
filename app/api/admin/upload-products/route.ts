@@ -19,21 +19,19 @@ export async function POST(request: Request) {
     if (mode === 'stock_only') {
       const updates = products.map((p: any) => ({
         sku: (p.sku || '').trim(),
-        length: (p.length || '').trim(),
         stock_main: parseInt(p.stock_main) || 0,
         stock_external: parseInt(p.stock_external) || 0,
       }))
 
-      // Duplikate im selben File filtern
+      // Duplikate im selben Excel-File filtern
       const uniqueStockMap = new Map<string, any>()
       for (const item of updates) {
-        const key = `${item.sku.toLowerCase()}_${item.length.toLowerCase()}`
-        uniqueStockMap.set(key, item)
+        uniqueStockMap.set(item.sku.toLowerCase(), item)
       }
       const deduplicatedStock = Array.from(uniqueStockMap.values())
 
       for (const item of deduplicatedStock) {
-        let query = supabaseAdmin
+        const { error } = await supabaseAdmin
           .from('products')
           .update({
             stock_main: item.stock_main,
@@ -41,11 +39,6 @@ export async function POST(request: Request) {
           })
           .eq('sku', item.sku)
 
-        if (item.length) {
-          query = query.eq('length', item.length)
-        }
-
-        const { error } = await query
         if (error) console.error(`Fehler bei SKU ${item.sku}:`, error.message)
       }
 
@@ -62,8 +55,11 @@ export async function POST(request: Request) {
           if (securePublicUrl) imageUrl = securePublicUrl
         }
 
+        // isUpdate und exists entfernen, damit Supabase keine nicht-existierenden Spalten sucht
+        const { isUpdate, exists, ...cleanProduct } = p
+
         return {
-          ...p,
+          ...cleanProduct,
           image_url: imageUrl,
         }
       })
@@ -77,6 +73,7 @@ export async function POST(request: Request) {
 
     const deduplicatedProducts = Array.from(uniqueProductsMap.values())
 
+    // Upsert in Supabase ausführen
     const { error } = await supabaseAdmin
       .from('products')
       .upsert(deduplicatedProducts, { onConflict: 'sku,length' })
