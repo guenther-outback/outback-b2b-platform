@@ -110,24 +110,56 @@ export default function UploadTab({ products, loadData }: UploadTabProps) {
         const worksheet = workbook.worksheets[0]
         if (!worksheet) throw new Error('Nessun foglio trovato.')
 
-        const headers: string[] = []
+        // Typensicherer Cell-Value Helper (verhindert TypeScript- & Runtime-Fehler)
+        const getCellValue = (cell: any): string => {
+          if (!cell || cell.value === null || cell.value === undefined) return ''
+          
+          let val = cell.value
 
+          // Falls es sich um ein Objekt handelt (Formel-Ergebnis, RichText, Hyperlink etc.)
+          if (typeof val === 'object') {
+            if ('result' in val && val.result !== null && val.result !== undefined) {
+              val = val.result
+            } else if ('text' in val && val.text !== null && val.text !== undefined) {
+              val = val.text
+            } else if ('richText' in val && Array.isArray(val.richText)) {
+              val = val.richText.map((rt: any) => rt.text || '').join('')
+            } else {
+              return ''
+            }
+          }
+
+          return String(val).trim()
+        }
+
+        // 1. Header-Zeile dynamisch suchen (sucht "SKU" oder "SKU Number" in den ersten 10 Zeilen)
+        let headerRowIndex = 1
         worksheet.eachRow((row, rowNumber) => {
-          if (rowNumber === 1) {
-            row.eachCell((cell, colNumber) => {
-              headers[colNumber] = cell.text ? String(cell.text).trim() : ''
+          if (rowNumber <= 10) {
+            row.eachCell((cell) => {
+              const val = getCellValue(cell).toLowerCase()
+              if (val === 'sku' || val === 'sku number' || val === 'sku_number') {
+                headerRowIndex = rowNumber
+              }
             })
-          } else {
+          }
+        })
+
+        const headers: { [colNumber: number]: string } = {}
+
+        // 2. Daten ab der gefundenen Header-Zeile auslesen
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber === headerRowIndex) {
+            row.eachCell((cell, colNumber) => {
+              const headerText = getCellValue(cell)
+              if (headerText) headers[colNumber] = headerText
+            })
+          } else if (rowNumber > headerRowIndex) {
             const rowObj: any = {}
             row.eachCell((cell, colNumber) => {
               const header = headers[colNumber]
               if (header) {
-                let val = cell.value
-                if (val !== null && typeof val === 'object') {
-                  if ('result' in val) val = (val as any).result
-                  else if ('text' in val) val = (val as any).text
-                }
-                rowObj[header] = val
+                rowObj[header] = getCellValue(cell)
               }
             })
             if (Object.keys(rowObj).length > 0) rawData.push(rowObj)
@@ -135,18 +167,35 @@ export default function UploadTab({ products, loadData }: UploadTabProps) {
         })
       }
 
+      // Helper zum Säubern von Mengenangaben (z. B. "50+" -> 50)
+      const parseStockValue = (val: any) => {
+        if (val === null || val === undefined) return 0
+        const strVal = String(val).replace(/[^0-9]/g, '')
+        return parseInt(strVal, 10) || 0
+      }
+
       if (importMode === 'stock_only') {
-        // Nur SKU, stock_main und stock_external verarbeiten
         const parsed = rawData.map((row: any) => {
-          const sku = String(row.SKU || row.sku || '').trim()
-          const existingProduct = products.find(p => p.sku.toLowerCase() === sku.toLowerCase())
+          const sku = String(
+            row['SKU Number'] || row['SKU_Number'] || row.SKU || row.sku || ''
+          ).trim()
+
+          const stockMainRaw = row.GiacenzaPrincipale || row.Stock || row.BestandHauptlager || row.stock_main
+          const stockExtRaw = row.GiacenzaEsterna || row.BestandAussenlager || row.stock_external
+
+          const stock_main = parseStockValue(stockMainRaw)
+          const stock_external = parseStockValue(stockExtRaw)
+
+          const existingProduct = products.find(
+            p => p.sku.toLowerCase() === sku.toLowerCase()
+          )
 
           return {
             sku,
             title: existingProduct?.title || '',
             brand: existingProduct?.brand || '',
-            stock_main: parseInt(row.GiacenzaPrincipale || row.BestandHauptlager || 0) || 0,
-            stock_external: parseInt(row.GiacenzaEsterna || row.BestandAussenlager || 0) || 0,
+            stock_main,
+            stock_external,
             exists: !!existingProduct
           }
         }).filter(item => item.sku !== '')
@@ -155,21 +204,21 @@ export default function UploadTab({ products, loadData }: UploadTabProps) {
         setUploadStatus(`${parsed.length} aggiornamenti giacenza pronti per l'anteprima.`)
       } else {
         const parsed = rawData.map((row: any) => {
-          const sku = String(row.SKU || row.sku || '').trim()
-          const length = String(row.Lunghezza || row.Länge || row.length || '').trim()
+          const sku = String(row['SKU Number'] || row.SKU || row.sku || '').trim()
+          const length = String(row.Lunghezza || row.Size || row.length || '').trim()
           const exists = products.some(p => p.sku === sku && (p.length || '') === length)
 
           return {
             sku,
             brand: String(row.Marca || row.Marke || row.brand || '').trim(),
-            category: String(row.Categoria || row.Kategorie || 'Skis').trim(),
-            title: String(row.Titolo || row.Titel || row.title || '').trim(),
+            category: String(row.Categoria || row.Category || 'Skis').trim(),
+            title: String(row.Titolo || row.Description || row.title || '').trim(),
             length,
-            color: String(row.Colore || row.Farbe || row.color || '').trim(),
+            color: String(row.Colore || row.Color || row.color || '').trim(),
             price_ek: parseFloat(row.PrezzoEK || row.EK || 0) || 0,
             price_vk: parseFloat(row.PrezzoVK || row.VK || 0) || 0,
-            stock_main: parseInt(row.GiacenzaPrincipale || row.BestandHauptlager || 0) || 0,
-            stock_external: parseInt(row.GiacenzaEsterna || row.BestandAussenlager || 0) || 0,
+            stock_main: parseStockValue(row.GiacenzaPrincipale || row.Stock || 0),
+            stock_external: parseStockValue(row.GiacenzaEsterna || 0),
             image_url: row.Immagine || row.Bild || null,
             isUpdate: exists
           }
