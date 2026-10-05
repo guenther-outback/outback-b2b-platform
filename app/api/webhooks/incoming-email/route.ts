@@ -65,31 +65,57 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Nessun allegato Excel trovato' }, { status: 200 })
     }
 
-    // 4. Anhang-Inhalt von Resend abrufen
+    // 4. Anhang-Inhalt abrufen
     let fileBuffer: Uint8Array | null = null
 
-    // Versuch 1: Über Resend SDK / API Abruf
-    try {
-      const res = await fetch(`https://api.resend.com/emails/${emailId}/attachments/${excelMeta.id}`, {
-        headers: {
-          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-        },
-      })
-
+    // Versuch A: Falls 'content' oder 'download_url' / 'url' direkt im Webhook übermittelt wurde
+    if (excelMeta.download_url || excelMeta.url) {
+      const downloadUrl = excelMeta.download_url || excelMeta.url
+      const res = await fetch(downloadUrl)
       if (res.ok) {
-        const arrayBuf = await res.arrayBuffer()
-        fileBuffer = new Uint8Array(arrayBuf)
+        fileBuffer = new Uint8Array(await res.arrayBuffer())
       }
-    } catch (e: any) {
-      console.error('[Email Webhook] Error fetching attachment via API:', e.message)
-    }
-
-    // Versuch 2: Falls der Anhang direkt als content/base64 im Payload übermittelt wurde
-    if (!fileBuffer && excelMeta.content) {
+    } else if (excelMeta.content) {
       if (Buffer.isBuffer(excelMeta.content)) {
         fileBuffer = new Uint8Array(excelMeta.content)
       } else if (typeof excelMeta.content === 'string') {
         fileBuffer = new Uint8Array(Buffer.from(excelMeta.content, 'base64'))
+      }
+    }
+
+    // Versuch B: Abruf über Resend receiving API endpoints
+    if (!fileBuffer) {
+      const endpoints = [
+        `https://api.resend.com/emails/receiving/${emailId}/attachments/${excelMeta.id}`,
+        `https://api.resend.com/emails/${emailId}/attachments/${excelMeta.id}`,
+        `https://api.resend.com/attachments/${excelMeta.id}`
+      ]
+
+      for (const endpoint of endpoints) {
+        try {
+          const res = await fetch(endpoint, {
+            headers: {
+              Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+            },
+          })
+
+          if (res.ok) {
+            const contentType = res.headers.get('content-type') || ''
+            if (contentType.includes('json')) {
+              const jsonRes = await res.json()
+              const base64Data = jsonRes.content || jsonRes.data
+              if (base64Data) {
+                fileBuffer = new Uint8Array(Buffer.from(base64Data, 'base64'))
+                break
+              }
+            } else {
+              fileBuffer = new Uint8Array(await res.arrayBuffer())
+              break
+            }
+          }
+        } catch (e: any) {
+          console.error(`[Email Webhook] Error testing endpoint ${endpoint}:`, e.message)
+        }
       }
     }
 
