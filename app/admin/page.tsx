@@ -40,8 +40,8 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
-      {/* Moderner, schlichter Admin Header */}
-      <header className="bg-slate-900/95 backdrop-blur-md text-slate-100 sticky top-0 z-30 border-b border-slate-800/80 shadow-sm transition-all">
+      {/* 1. DUNKEL-BLAUER HEADER (Fixiert ganz oben) */}
+      <header className="bg-slate-900/95 backdrop-blur-md text-slate-100 sticky top-0 z-40 border-b border-slate-800/80 shadow-sm transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <h1 className="text-base sm:text-lg font-semibold tracking-tight text-white">
@@ -59,19 +59,38 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 w-full flex-1">
-        <div className="flex border-b border-gray-300 mb-6 gap-4 overflow-x-auto">
-          <button onClick={() => setActiveTab('products')} className={`pb-2 px-4 font-medium text-sm border-b-2 whitespace-nowrap ${activeTab === 'products' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'}`}>
+      {/* 2. STICKY TAB-NAVIGATION (Direkt unter dem Header fixiert) */}
+      <div className="sticky top-[49px] z-30 bg-gray-100/95 backdrop-blur-md border-b border-gray-300 shadow-sm pt-4 pb-2 mb-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex gap-4 overflow-x-auto">
+          <button 
+            onClick={() => setActiveTab('products')} 
+            className={`pb-2 px-4 font-medium text-sm border-b-2 whitespace-nowrap transition-all ${
+              activeTab === 'products' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'
+            }`}
+          >
             📦 Modelli & Varianti ({Object.keys(groupedProducts).length})
           </button>
-          <button onClick={() => setActiveTab('customers')} className={`pb-2 px-4 font-medium text-sm border-b-2 whitespace-nowrap ${activeTab === 'customers' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'}`}>
+          <button 
+            onClick={() => setActiveTab('customers')} 
+            className={`pb-2 px-4 font-medium text-sm border-b-2 whitespace-nowrap transition-all ${
+              activeTab === 'customers' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'
+            }`}
+          >
             👥 Whitelist Clienti ({customers.length})
           </button>
-          <button onClick={() => setActiveTab('upload')} className={`pb-2 px-4 font-medium text-sm border-b-2 whitespace-nowrap ${activeTab === 'upload' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'}`}>
+          <button 
+            onClick={() => setActiveTab('upload')} 
+            className={`pb-2 px-4 font-medium text-sm border-b-2 whitespace-nowrap transition-all ${
+              activeTab === 'upload' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'
+            }`}
+          >
             📊 Importazione Excel / CSV
           </button>
         </div>
+      </div>
 
+      {/* HAUPTINHALT */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-8 w-full flex-1">
         {loading ? (
           <p className="text-center py-12 text-gray-500">...</p>
         ) : (

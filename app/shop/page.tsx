@@ -358,71 +358,98 @@ export default function ShopPage() {
                       
                       {/* VARIANTEN AUSWAHL: FARBE & LÄNGE */}
                       <div className="space-y-3 mb-4">
-                        {/* Farbauswahl: Nur Dropdown wenn > 1 Farbe, sonst elegantes Text-Badge */}
-                        {availableColors.length > 1 ? (
-                          <div>
-                            <label className="block text-xs font-bold text-gray-800 mb-1">
-                              {t('shop.select_color') || 'Farbe wählen:'}
-                            </label>
-                            <select
-                              value={currentColor}
-                              onChange={(e) => {
-                                const newColor = e.target.value
-                                setSelectedColors({ ...selectedColors, [groupKey]: newColor })
-                                
-                                const nextGroup = group.filter(p => p.color === newColor && getEffectiveStock(p).total > 0)
-                                if (nextGroup.length > 0) {
-                                  setSelectedLengths({ ...selectedLengths, [groupKey]: nextGroup[0].length })
-                                }
-                              }}
-                              className="w-full p-2 border border-gray-300 rounded text-sm bg-gray-50 focus:bg-white font-medium text-gray-800"
-                            >
-                              {availableColors.map((color) => (
-                                <option key={color} value={color}>{color}</option>
-                              ))}
-                            </select>
-                          </div>
-                        ) : availableColors.length === 1 && availableColors[0] !== '' ? (
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="font-bold text-gray-700">{t('shop.select_color') || 'Farbe:'}</span>
-                            <span className="bg-gray-100 border border-gray-200 text-gray-800 font-semibold px-2.5 py-1 rounded-md">
-                              {availableColors[0]}
-                            </span>
-                          </div>
-                        ) : null}
+                        {/* Prüfen, ob eine Längenauswahl existiert */}
+                        {(() => {
+                          const hasValidLengths = availableLengths.length > 0 && availableLengths.some(l => l !== '')
 
-                        {/* Längenauswahl: Nur Dropdown wenn > 1 Länge, sonst elegantes Text-Badge */}
-                        {availableLengths.length > 1 ? (
-                          <div>
-                            <label className="block text-xs font-bold text-gray-800 mb-1">
-                              {t('shop.select_length')}:
-                            </label>
-                            <select
-                              value={currentLength}
-                              onChange={(e) => setSelectedLengths({ ...selectedLengths, [groupKey]: e.target.value })}
-                              className="w-full p-2 border border-gray-300 rounded text-sm bg-gray-50 focus:bg-white font-medium text-gray-800"
-                            >
-                              {availableLengths.map((len) => {
-                                const variant = colorFilteredGroup.find(p => p.length === len)
-                                if (!variant) return null
-                                const { total: stock } = getEffectiveStock(variant)
+                          return (
+                            <>
+                              {/* FARBAUSWAHL */}
+                              {availableColors.length > 1 ? (
+                                <div>
+                                  <label className="block text-xs font-bold text-gray-800 mb-1">
+                                    {t('shop.select_color') || 'Farbe wählen:'}
+                                  </label>
+                                  <select
+                                    value={currentColor}
+                                    onChange={(e) => {
+                                      const newColor = e.target.value
+                                      setSelectedColors({ ...selectedColors, [groupKey]: newColor })
+                                      
+                                      const nextGroup = group.filter(p => p.color === newColor && getEffectiveStock(p).total > 0)
+                                      if (nextGroup.length > 0) {
+                                        setSelectedLengths({ ...selectedLengths, [groupKey]: nextGroup[0].length })
+                                      }
+                                    }}
+                                    className="w-full p-2 border border-gray-300 rounded text-sm bg-gray-50 focus:bg-white font-medium text-gray-800"
+                                  >
+                                    {availableColors.map((color) => {
+                                      // Falls es keine Längenauswahl gibt (Unisize), Bestand direkt bei der Farbe im Dropdown anzeigen
+                                      const variant = colorFilteredGroup.find(p => p.color === color)
+                                      const stockInfo = !hasValidLengths && variant ? ` (${t('shop.stock')}: ${getEffectiveStock(variant).total})` : ''
 
-                                return (
-                                  <option key={len} value={len}>
-                                    {len} ({t('shop.stock')}: {stock})
-                                  </option>
-                                )
-                              })}
-                            </select>
-                          </div>
-                        ) : availableLengths.length === 1 && availableLengths[0] !== '' ? (
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="font-bold text-gray-700">{t('shop.select_length')}:</span>
-                            <span className="bg-gray-100 border border-gray-200 text-gray-800 font-semibold px-2.5 py-1 rounded-md">
-                              {availableLengths[0]}
-                            </span>
-                          </div>
-                        ) : null}
+                                      return (
+                                        <option key={color} value={color}>
+                                          {color}{stockInfo}
+                                        </option>
+                                      )
+                                    })}
+                                  </select>
+                                </div>
+                              ) : availableColors.length === 1 && availableColors[0] !== '' ? (
+                                <div className="flex items-center gap-2 text-xs">
+                                  <span className="font-bold text-gray-700">{t('shop.select_color') || 'Farbe:'}</span>
+                                  <span className="bg-gray-100 border border-gray-200 text-gray-800 font-semibold px-2.5 py-1 rounded-md">
+                                    {availableColors[0]}
+                                    {/* Falls Unisize, Bestand hier beim festen Farb-Badge anzeigen */}
+                                    {!hasValidLengths && activeVariant && (
+                                      <span className="ml-1 text-gray-600 font-normal">
+                                        ({t('shop.stock')}: {getEffectiveStock(activeVariant).total})
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
+                              ) : null}
+
+                              {/* LÄNGENAUSWAHL */}
+                              {availableLengths.length > 1 ? (
+                                <div>
+                                  <label className="block text-xs font-bold text-gray-800 mb-1">
+                                    {t('shop.select_length')}:
+                                  </label>
+                                  <select
+                                    value={currentLength}
+                                    onChange={(e) => setSelectedLengths({ ...selectedLengths, [groupKey]: e.target.value })}
+                                    className="w-full p-2 border border-gray-300 rounded text-sm bg-gray-50 focus:bg-white font-medium text-gray-800"
+                                  >
+                                    {availableLengths.map((len) => {
+                                      const variant = colorFilteredGroup.find(p => p.length === len)
+                                      if (!variant) return null
+                                      const { total: stock } = getEffectiveStock(variant)
+
+                                      return (
+                                        <option key={len} value={len}>
+                                          {len} ({t('shop.stock')}: {stock})
+                                        </option>
+                                      )
+                                    })}
+                                  </select>
+                                </div>
+                              ) : availableLengths.length === 1 && availableLengths[0] !== '' ? (
+                                <div className="flex items-center gap-2 text-xs">
+                                  <span className="font-bold text-gray-700">{t('shop.select_length')}:</span>
+                                  <span className="bg-gray-100 border border-gray-200 text-gray-800 font-semibold px-2.5 py-1 rounded-md">
+                                    {availableLengths[0]}
+                                    {/* Bestand bei nur 1 fixen Länge direkt im Badge anzeigen */}
+                                    <span className="ml-1 text-gray-600 font-normal">
+                                      ({t('shop.stock')}: {effectiveStock.total})
+                                    </span>
+                                  </span>
+                                </div>
+                              ) : null}
+                            </>
+                          )
+                        })()}
                       </div>
                     </div>
 

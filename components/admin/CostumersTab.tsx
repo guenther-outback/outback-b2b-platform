@@ -11,6 +11,8 @@ interface CustomersTabProps {
 
 export default function CustomersTab({ customers, availableBrands, loadData }: CustomersTabProps) {
   const [editingCustomerId, setEditingEditingCustomerId] = useState<string | null>(null)
+  const [customerSearch, setCustomerSearch] = useState('')
+  
   const [newCustomer, setNewCustomer] = useState({
     company_name: '', 
     contact_name: '', 
@@ -23,6 +25,19 @@ export default function CustomersTab({ customers, availableBrands, loadData }: C
   })
 
   const supabase = createClient()
+
+  // Filterlogik für die Kundensuche
+  const filteredCustomers = customers.filter(c => {
+    const query = customerSearch.toLowerCase().trim()
+    if (!query) return true
+
+    const company = (c.company_name || '').toLowerCase()
+    const contact = (c.contact_name || '').toLowerCase()
+    const email = (c.email || '').toLowerCase()
+    const city = (c.city || '').toLowerCase()
+
+    return company.includes(query) || contact.includes(query) || email.includes(query) || city.includes(query)
+  })
 
   const handleBrandToggle = (brand: string) => {
     setNewCustomer(prev => {
@@ -102,7 +117,7 @@ export default function CustomersTab({ customers, availableBrands, loadData }: C
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       {/* Formular per Creazione / Modifica */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 h-fit">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 lg:sticky lg:top-24 lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-bold text-lg text-gray-800">
             {editingCustomerId ? 'Modifica Cliente' : 'Abilita Cliente B2B'}
@@ -190,9 +205,34 @@ export default function CustomersTab({ customers, availableBrands, loadData }: C
         </form>
       </div>
 
-      {/* Tabella Clienti B2B */}
+      {/* Tabella Clienti B2B mit Suchleiste */}
       <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
-        <h2 className="font-bold text-lg mb-4 text-gray-800">Clienti B2B Abilitati</h2>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+          <h2 className="font-bold text-lg text-gray-800 shrink-0">
+            Clienti B2B Abilitati ({filteredCustomers.length})
+          </h2>
+
+          {/* SUCHLEISTE FÜR KUNDEN */}
+          <div className="relative w-full sm:w-64">
+            <input
+              type="text"
+              placeholder="Cerca cliente, e-mail, città..."
+              value={customerSearch}
+              onChange={(e) => setCustomerSearch(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-md text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+            <span className="absolute left-2.5 top-1.5 text-gray-400 text-xs">🔍</span>
+            {customerSearch && (
+              <button
+                onClick={() => setCustomerSearch('')}
+                className="absolute right-2.5 top-1.5 text-gray-400 hover:text-gray-700 text-xs font-bold"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+
         <table className="w-full text-left text-xs">
           <thead>
             <tr className="bg-gray-100 border-b border-gray-200 text-gray-800 font-bold">
@@ -204,40 +244,48 @@ export default function CustomersTab({ customers, availableBrands, loadData }: C
             </tr>
           </thead>
           <tbody>
-            {customers.map(c => (
-              <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="p-2 font-bold text-gray-900">
-                  {c.company_name}
-                  <div className="text-[10px] font-normal text-gray-600">{c.contact_name} ({c.city})</div>
-                </td>
-                <td className="p-2 font-mono text-gray-700">{c.email}</td>
-                <td className="p-2">
-                  {!c.allowed_brands || c.allowed_brands.length === 0 ? (
-                    <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded font-bold">Tutti</span>
-                  ) : (
-                    <div className="flex flex-wrap gap-1">
-                      {c.allowed_brands.map((b: string) => (
-                        <span key={b} className="bg-blue-50 text-blue-800 border border-blue-200 text-[10px] px-1.5 py-0.5 rounded font-medium">
-                          {b}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </td>
-                <td className="p-2">
-                  <button onClick={() => handleToggleAdmin(c)} title="Clicca per cambiare">
-                    {c.is_admin ? (
-                      <span className="bg-purple-100 text-purple-800 text-[10px] px-2 py-0.5 rounded font-bold">👑 Admin</span>
-                    ) : (
-                      <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded font-bold">👤 Cliente</span>
-                    )}
-                  </button>
-                </td>
-                <td className="p-2 text-right">
-                  <button onClick={() => handleEditClick(c)} className="p-1 text-slate-600 hover:text-blue-600 text-sm font-bold" title="Modifica cliente">✏️</button>
+            {filteredCustomers.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="p-4 text-center text-gray-500">
+                  Nessun cliente trovato per "{customerSearch}".
                 </td>
               </tr>
-            ))}
+            ) : (
+              filteredCustomers.map(c => (
+                <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="p-2 font-bold text-gray-900">
+                    {c.company_name}
+                    <div className="text-[10px] font-normal text-gray-600">{c.contact_name} ({c.city})</div>
+                  </td>
+                  <td className="p-2 font-mono text-gray-700">{c.email}</td>
+                  <td className="p-2">
+                    {!c.allowed_brands || c.allowed_brands.length === 0 ? (
+                      <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded font-bold">Tutti</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {c.allowed_brands.map((b: string) => (
+                          <span key={b} className="bg-blue-50 text-blue-800 border border-blue-200 text-[10px] px-1.5 py-0.5 rounded font-medium">
+                            {b}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                  <td className="p-2">
+                    <button onClick={() => handleToggleAdmin(c)} title="Clicca per cambiare">
+                      {c.is_admin ? (
+                        <span className="bg-purple-100 text-purple-800 text-[10px] px-2 py-0.5 rounded font-bold">👑 Admin</span>
+                      ) : (
+                        <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded font-bold">👤 Cliente</span>
+                      )}
+                    </button>
+                  </td>
+                  <td className="p-2 text-right">
+                    <button onClick={() => handleEditClick(c)} className="p-1 text-slate-600 hover:text-blue-600 text-sm font-bold" title="Modifica cliente">✏️</button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

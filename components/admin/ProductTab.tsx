@@ -176,7 +176,7 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       {/* Form Creazione / Modifica (Nicht mehr sticky auf Mobilgeräten) */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 h-fit lg:sticky lg:top-20">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 lg:sticky lg:top-24 lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-bold text-lg text-gray-800">{editingId ? 'Modifica Variante' : 'Crea Variante Prodotto'}</h2>
           {editingId && <button onClick={resetForm} className="text-xs text-red-500 underline">Annulla</button>}
