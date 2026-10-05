@@ -3,6 +3,9 @@ import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 import ExcelJS from 'exceljs'
 
+// Erhöht das Vercel Serverless Function Timeout auf bis zu 60 Sekunden (falls nötig)
+export const maxDuration = 60
+
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -57,7 +60,7 @@ export async function POST(request: Request) {
     })
 
     if (listError || !attachmentList || !attachmentList.data || attachmentList.data.length === 0) {
-      console.log('[Email Webhook] Nessun allegato trovato tramite Attachments API.')
+      console.log('[Email Webhook] Nessun allegato trovato.')
       return NextResponse.json({ message: 'Nessun allegato trovato' }, { status: 200 })
     }
 
@@ -73,7 +76,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Nessun allegato Excel valido trovato' }, { status: 200 })
     }
 
-    // 5. Excel-Datei direkt über die temporäre download_url herunterladen
+    // 5. Excel-Datei herunterladen
     const fileResponse = await fetch(excelAttachment.download_url)
     if (!fileResponse.ok) {
       throw new Error(`Download fallito della lista Excel: ${fileResponse.statusText}`)
@@ -142,25 +145,25 @@ export async function POST(request: Request) {
     }
     const deduplicatedStock = Array.from(uniqueStockMap.values())
 
-    // 8. Supabase-Update durchführen
-    let updatedCount = 0
-    for (const item of deduplicatedStock) {
-      const { error } = await supabaseAdmin
-        .from('products')
-        .update({
-          stock_main: item.stock_main,
-          stock_external: item.stock_external,
-        })
-        .eq('sku', item.sku)
-
-      if (!error) updatedCount++
+    if (deduplicatedStock.length === 0) {
+      return NextResponse.json({ message: 'Nessun prodotto valido da aggiornare' }, { status: 200 })
     }
 
-    console.log(`[Email Webhook] Successo! Aggiornati ${updatedCount} prodotti da e-mail.`)
+    // 8. Blitzschnelles Supabase Bulk Upsert (alle Zeilen auf einmal)
+    const { error: upsertError } = await supabaseAdmin
+      .from('products')
+      .upsert(deduplicatedStock, { onConflict: 'sku', ignoreDuplicates: false })
+
+    if (upsertError) {
+      console.error('[Email Webhook] Supabase Bulk Error:', upsertError.message)
+      throw new Error(`Errore durante l'aggiornamento del database: ${upsertError.message}`)
+    }
+
+    console.log(`[Email Webhook] Successo! Aggiornati ${deduplicatedStock.length} prodotti da e-mail.`)
 
     return NextResponse.json({
       success: true,
-      message: `Aggiornati ${updatedCount} prodotti con successo da allegato e-mail`,
+      message: `Aggiornati ${deduplicatedStock.length} prodotti con successo da allegato e-mail`,
       from: emailData.from
     })
 
