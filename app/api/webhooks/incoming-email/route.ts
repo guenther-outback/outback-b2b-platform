@@ -3,7 +3,6 @@ import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 import ExcelJS from 'exceljs'
 
-// Erhöht das Vercel Serverless Function Timeout auf bis zu 60 Sekunden (falls nötig)
 export const maxDuration = 60
 
 const supabaseAdmin = createClient(
@@ -149,21 +148,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Nessun prodotto valido da aggiornare' }, { status: 200 })
     }
 
-    // 8. Blitzschnelles Supabase Bulk Upsert (alle Zeilen auf einmal)
-    const { error: upsertError } = await supabaseAdmin
-      .from('products')
-      .upsert(deduplicatedStock, { onConflict: 'sku', ignoreDuplicates: false })
+    // 8. Paralleles Update bestehender Produkte in 50er-Batches
+    let updatedCount = 0
+    const BATCH_SIZE = 50
 
-    if (upsertError) {
-      console.error('[Email Webhook] Supabase Bulk Error:', upsertError.message)
-      throw new Error(`Errore durante l'aggiornamento del database: ${upsertError.message}`)
+    for (let i = 0; i < deduplicatedStock.length; i += BATCH_SIZE) {
+      const batch = deduplicatedStock.slice(i, i + BATCH_SIZE)
+      
+      await Promise.all(
+        batch.map(async (item) => {
+          const { error } = await supabaseAdmin
+            .from('products')
+            .update({
+              stock_main: item.stock_main,
+              stock_external: item.stock_external,
+            })
+            .eq('sku', item.sku)
+
+          if (!error) updatedCount++
+        })
+      )
     }
 
-    console.log(`[Email Webhook] Successo! Aggiornati ${deduplicatedStock.length} prodotti da e-mail.`)
+    console.log(`[Email Webhook] Successo! Aggiornati ${updatedCount} prodotti da e-mail.`)
 
     return NextResponse.json({
       success: true,
-      message: `Aggiornati ${deduplicatedStock.length} prodotti con successo da allegato e-mail`,
+      message: `Aggiornati ${updatedCount} prodotti con successo da allegato e-mail`,
       from: emailData.from
     })
 
