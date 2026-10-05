@@ -50,80 +50,38 @@ export async function POST(request: Request) {
     }
 
     const emailId = emailData.email_id
-    const attachments = emailData.attachments || []
 
-    // 3. Nach Excel-Anhang (.xlsx / .xls) suchen
-    const excelMeta = attachments.find((att: any) =>
+    // 3. Offizielle Resend Attachments API für Inbound-Mails aufrufen
+    const { data: attachmentList, error: listError } = await resend.emails.receiving.attachments.list({
+      emailId: emailId,
+    })
+
+    if (listError || !attachmentList || !attachmentList.data || attachmentList.data.length === 0) {
+      console.log('[Email Webhook] Nessun allegato trovato tramite Attachments API.')
+      return NextResponse.json({ message: 'Nessun allegato trovato' }, { status: 200 })
+    }
+
+    // 4. Excel-Datei (.xlsx / .xls) in der Liste finden
+    const excelAttachment = attachmentList.data.find((att: any) =>
       att.filename?.toLowerCase().endsWith('.xlsx') ||
       att.filename?.toLowerCase().endsWith('.xls') ||
       att.content_type?.includes('spreadsheet') ||
       att.content_type?.includes('excel')
     )
 
-    if (!excelMeta) {
-      console.log('[Email Webhook] Nessun allegato Excel trovato nella mail.')
-      return NextResponse.json({ message: 'Nessun allegato Excel trovato' }, { status: 200 })
+    if (!excelAttachment || !excelAttachment.download_url) {
+      return NextResponse.json({ message: 'Nessun allegato Excel valido trovato' }, { status: 200 })
     }
 
-    // 4. Anhang-Inhalt abrufen
-    let fileBuffer: Uint8Array | null = null
-
-    // Versuch A: Falls 'content' oder 'download_url' / 'url' direkt im Webhook übermittelt wurde
-    if (excelMeta.download_url || excelMeta.url) {
-      const downloadUrl = excelMeta.download_url || excelMeta.url
-      const res = await fetch(downloadUrl)
-      if (res.ok) {
-        fileBuffer = new Uint8Array(await res.arrayBuffer())
-      }
-    } else if (excelMeta.content) {
-      if (Buffer.isBuffer(excelMeta.content)) {
-        fileBuffer = new Uint8Array(excelMeta.content)
-      } else if (typeof excelMeta.content === 'string') {
-        fileBuffer = new Uint8Array(Buffer.from(excelMeta.content, 'base64'))
-      }
+    // 5. Excel-Datei direkt über die temporäre download_url herunterladen
+    const fileResponse = await fetch(excelAttachment.download_url)
+    if (!fileResponse.ok) {
+      throw new Error(`Download fallito della lista Excel: ${fileResponse.statusText}`)
     }
 
-    // Versuch B: Abruf über Resend receiving API endpoints
-    if (!fileBuffer) {
-      const endpoints = [
-        `https://api.resend.com/emails/receiving/${emailId}/attachments/${excelMeta.id}`,
-        `https://api.resend.com/emails/${emailId}/attachments/${excelMeta.id}`,
-        `https://api.resend.com/attachments/${excelMeta.id}`
-      ]
+    const fileBuffer = new Uint8Array(await fileResponse.arrayBuffer())
 
-      for (const endpoint of endpoints) {
-        try {
-          const res = await fetch(endpoint, {
-            headers: {
-              Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-            },
-          })
-
-          if (res.ok) {
-            const contentType = res.headers.get('content-type') || ''
-            if (contentType.includes('json')) {
-              const jsonRes = await res.json()
-              const base64Data = jsonRes.content || jsonRes.data
-              if (base64Data) {
-                fileBuffer = new Uint8Array(Buffer.from(base64Data, 'base64'))
-                break
-              }
-            } else {
-              fileBuffer = new Uint8Array(await res.arrayBuffer())
-              break
-            }
-          }
-        } catch (e: any) {
-          console.error(`[Email Webhook] Error testing endpoint ${endpoint}:`, e.message)
-        }
-      }
-    }
-
-    if (!fileBuffer) {
-      return NextResponse.json({ error: 'Impossibile scaricare il contenuto dell allegato' }, { status: 500 })
-    }
-
-    // 5. Excel im Speicher verarbeiten
+    // 6. Excel im Speicher verarbeiten
     const workbook = new ExcelJS.Workbook()
     await workbook.xlsx.load(fileBuffer as any)
 
@@ -164,7 +122,7 @@ export async function POST(request: Request) {
       }
     })
 
-    // 6. Bestände aufbereiten
+    // 7. Bestände aufbereiten
     const updates = rawData.map((row: any) => {
       const sku = String(row['SKU Number'] || row['SKU_Number'] || row.SKU || row.sku || '').trim()
       const stockMainRaw = row.GiacenzaPrincipale || row.Stock || row.BestandHauptlager || row.stock_main || 0
@@ -184,7 +142,7 @@ export async function POST(request: Request) {
     }
     const deduplicatedStock = Array.from(uniqueStockMap.values())
 
-    // 7. Supabase-Update durchführen
+    // 8. Supabase-Update durchführen
     let updatedCount = 0
     for (const item of deduplicatedStock) {
       const { error } = await supabaseAdmin
