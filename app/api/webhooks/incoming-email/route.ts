@@ -50,45 +50,54 @@ export async function POST(request: Request) {
     }
 
     const emailId = emailData.email_id
+    const attachments = emailData.attachments || []
 
- // 3. Empfangene E-Mail samt Anhängen über das Inbound/Receiving API-Modul abrufen
-    const { data: fullEmail, error: fetchError } = await resend.emails.receiving.get(emailId)
-
-    if (fetchError || !fullEmail) {
-      // Fallback: Falls attachments bereits im Webhook-Payload enthalten sind
-      if (emailData.attachments && emailData.attachments.length > 0) {
-        console.log('[Email Webhook] Verwende Webhook-Payload Attachments als Fallback.')
-      } else {
-        throw new Error(`Impossibile recuperare l'email da Resend: ${fetchError?.message || 'Email non trovata'}`)
-      }
-    }
-
-    const attachments = fullEmail?.attachments || emailData.attachments || []
-
-    // 4. Nach Excel-Anhang (.xlsx / .xls) suchen
-    const excelAttachment = attachments.find((att: any) =>
+    // 3. Nach Excel-Anhang (.xlsx / .xls) suchen
+    const excelMeta = attachments.find((att: any) =>
       att.filename?.toLowerCase().endsWith('.xlsx') ||
       att.filename?.toLowerCase().endsWith('.xls') ||
-      att.content_type?.includes('spreadsheet')
+      att.content_type?.includes('spreadsheet') ||
+      att.content_type?.includes('excel')
     )
 
-    if (!excelAttachment || !excelAttachment.content) {
-      console.log('[Email Webhook] Nessun allegato Excel valido trovato nella mail.')
+    if (!excelMeta) {
+      console.log('[Email Webhook] Nessun allegato Excel trovato nella mail.')
       return NextResponse.json({ message: 'Nessun allegato Excel trovato' }, { status: 200 })
     }
 
-    // 5. Attachment Content sicher in ein Uint8Array umwandeln
-    let fileBuffer: Uint8Array
+    // 4. Anhang-Inhalt von Resend abrufen
+    let fileBuffer: Uint8Array | null = null
 
-    if (Buffer.isBuffer(excelAttachment.content)) {
-      fileBuffer = new Uint8Array(excelAttachment.content)
-    } else if (typeof excelAttachment.content === 'string') {
-      fileBuffer = new Uint8Array(Buffer.from(excelAttachment.content, 'base64'))
-    } else {
-      fileBuffer = new Uint8Array(Buffer.from(excelAttachment.content as any))
+    // Versuch 1: Über Resend SDK / API Abruf
+    try {
+      const res = await fetch(`https://api.resend.com/emails/${emailId}/attachments/${excelMeta.id}`, {
+        headers: {
+          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        },
+      })
+
+      if (res.ok) {
+        const arrayBuf = await res.arrayBuffer()
+        fileBuffer = new Uint8Array(arrayBuf)
+      }
+    } catch (e: any) {
+      console.error('[Email Webhook] Error fetching attachment via API:', e.message)
     }
 
-    // 6. Excel im Speicher verarbeiten
+    // Versuch 2: Falls der Anhang direkt als content/base64 im Payload übermittelt wurde
+    if (!fileBuffer && excelMeta.content) {
+      if (Buffer.isBuffer(excelMeta.content)) {
+        fileBuffer = new Uint8Array(excelMeta.content)
+      } else if (typeof excelMeta.content === 'string') {
+        fileBuffer = new Uint8Array(Buffer.from(excelMeta.content, 'base64'))
+      }
+    }
+
+    if (!fileBuffer) {
+      return NextResponse.json({ error: 'Impossibile scaricare il contenuto dell allegato' }, { status: 500 })
+    }
+
+    // 5. Excel im Speicher verarbeiten
     const workbook = new ExcelJS.Workbook()
     await workbook.xlsx.load(fileBuffer as any)
 
@@ -129,7 +138,7 @@ export async function POST(request: Request) {
       }
     })
 
-    // 7. Bestände aufbereiten
+    // 6. Bestände aufbereiten
     const updates = rawData.map((row: any) => {
       const sku = String(row['SKU Number'] || row['SKU_Number'] || row.SKU || row.sku || '').trim()
       const stockMainRaw = row.GiacenzaPrincipale || row.Stock || row.BestandHauptlager || row.stock_main || 0
@@ -149,7 +158,7 @@ export async function POST(request: Request) {
     }
     const deduplicatedStock = Array.from(uniqueStockMap.values())
 
-    // 8. Supabase-Update durchführen
+    // 7. Supabase-Update durchführen
     let updatedCount = 0
     for (const item of deduplicatedStock) {
       const { error } = await supabaseAdmin
