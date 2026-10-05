@@ -68,7 +68,8 @@ export async function POST(request: Request) {
 
     // 4. Excel-Datei direkt im Buffer verarbeiten
     const workbook = new ExcelJS.Workbook()
-    await workbook.xlsx.load(excelAttachment.content)
+// Konvertierung in Uint8Array bzw. Any verhindert den Buffer-Typkonflikt mit ExcelJS
+await workbook.xlsx.load(new Uint8Array(excelAttachment.content) as any)
 
     const worksheet = workbook.worksheets[0]
     if (!worksheet) {
