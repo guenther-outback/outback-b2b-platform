@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { simpleParser } from 'mailparser'
+import { Resend } from 'resend'
 import ExcelJS from 'exceljs'
 
 const supabaseAdmin = createClient(
@@ -8,7 +8,9 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// Helper zum sicheren Auslesen von Excel-Zellen (selbe Logik wie im Frontend)
+const resend = new Resend(process.env.RESEND_API_KEY)
+
+// Helper zum sicheren Auslesen von Excel-Zellen
 const getCellValue = (cell: any): string => {
   if (!cell || cell.value === null || cell.value === undefined) return ''
   let val = cell.value
@@ -30,7 +32,7 @@ const parseStockValue = (val: any) => {
 
 export async function POST(request: Request) {
   try {
-    // 1. Sicherheit: Webhook-Token prüfen (falls konfiguriert)
+    // 1. Secret/Token aus Query-Parametern prüfen
     const url = new URL(request.url)
     const secret = url.searchParams.get('secret')
     const expectedSecret = process.env.EMAIL_WEBHOOK_SECRET
@@ -39,44 +41,58 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
     }
 
-    // 2. E-Mail Body parsen
-    const formData = await request.formData()
-    // Je nach Inbound-Provider (Resend, SendGrid, Mailgun) kommt die Mail als raw 'email' oder 'message'
-    const rawEmail = formData.get('email') || formData.get('body-mime') || formData.get('message')
+    // 2. Resend JSON-Body parsen
+    const payload = await request.json()
+    const emailData = payload?.data
 
-    if (!rawEmail) {
-      return NextResponse.json({ error: 'Nessun contenuto e-mail trovato' }, { status: 400 })
+    if (!emailData || !emailData.email_id) {
+      return NextResponse.json({ message: 'Nessun dato e-mail valido ricevuto' }, { status: 200 })
     }
 
-    const parsedEmail = await simpleParser(rawEmail as any)
+    const emailId = emailData.email_id
 
-    // Optional: Absender-Prüfung
-    const sender = parsedEmail.from?.text || ''
-    console.log(`[Email Webhook] Ricevuta e-mail da: ${sender}, Oggetto: ${parsedEmail.subject}`)
+    // 3. Ganze E-Mail samt Anhängen über das Resend SDK abrufen
+    const { data: fullEmail, error: fetchError } = await resend.emails.get(emailId)
 
-    // 3. Suche nach Excel-Anhang (.xlsx oder .xls)
-    const excelAttachment = parsedEmail.attachments.find(att => 
-      att.filename?.toLowerCase().endsWith('.xlsx') || 
+    if (fetchError || !fullEmail) {
+      throw new Error(`Impossibile recuperare l'email da Resend: ${fetchError?.message || 'Email non trovata'}`)
+    }
+
+    const attachments = (fullEmail as any).attachments || []
+
+    // 4. Nach Excel-Anhang (.xlsx / .xls) suchen
+    const excelAttachment = attachments.find((att: any) =>
+      att.filename?.toLowerCase().endsWith('.xlsx') ||
       att.filename?.toLowerCase().endsWith('.xls') ||
-      att.contentType.includes('spreadsheet')
+      att.content_type?.includes('spreadsheet')
     )
 
-    if (!excelAttachment) {
-      console.log('[Email Webhook] Nessun file Excel allegato trovato.')
+    if (!excelAttachment || !excelAttachment.content) {
+      console.log('[Email Webhook] Nessun allegato Excel valido trovato nella mail.')
       return NextResponse.json({ message: 'Nessun allegato Excel trovato' }, { status: 200 })
     }
 
-    // 4. Excel-Datei direkt im Buffer verarbeiten
+    // 5. Attachment Content sicher in ein Uint8Array umwandeln
+    let fileBuffer: Uint8Array
+
+    if (Buffer.isBuffer(excelAttachment.content)) {
+      fileBuffer = new Uint8Array(excelAttachment.content)
+    } else if (typeof excelAttachment.content === 'string') {
+      fileBuffer = new Uint8Array(Buffer.from(excelAttachment.content, 'base64'))
+    } else {
+      fileBuffer = new Uint8Array(Buffer.from(excelAttachment.content as any))
+    }
+
+    // 6. Excel im Speicher verarbeiten
     const workbook = new ExcelJS.Workbook()
-// Konvertierung in Uint8Array bzw. Any verhindert den Buffer-Typkonflikt mit ExcelJS
-await workbook.xlsx.load(new Uint8Array(excelAttachment.content) as any)
+    await workbook.xlsx.load(fileBuffer as any)
 
     const worksheet = workbook.worksheets[0]
     if (!worksheet) {
       return NextResponse.json({ error: 'Foglio Excel vuoto' }, { status: 400 })
     }
 
-    // Header-Zeile suchen (Zeile 1 bis 10)
+    // Header-Zeile dynamisch suchen (Zeile 1 bis 10)
     let headerRowIndex = 1
     worksheet.eachRow((row, rowNumber) => {
       if (rowNumber <= 10) {
@@ -108,7 +124,7 @@ await workbook.xlsx.load(new Uint8Array(excelAttachment.content) as any)
       }
     })
 
-    // 5. Bestands-Updates vorbereiten
+    // 7. Bestände aufbereiten
     const updates = rawData.map((row: any) => {
       const sku = String(row['SKU Number'] || row['SKU_Number'] || row.SKU || row.sku || '').trim()
       const stockMainRaw = row.GiacenzaPrincipale || row.Stock || row.BestandHauptlager || row.stock_main || 0
@@ -119,16 +135,16 @@ await workbook.xlsx.load(new Uint8Array(excelAttachment.content) as any)
         stock_main: parseStockValue(stockMainRaw),
         stock_external: parseStockValue(stockExtRaw)
       }
-    }).filter(item => item.sku !== '')
+    }).filter((item: any) => item.sku !== '')
 
-    // Duplikate filtern
+    // Duplikate entfernen
     const uniqueStockMap = new Map<string, any>()
     for (const item of updates) {
       uniqueStockMap.set(item.sku.toLowerCase(), item)
     }
     const deduplicatedStock = Array.from(uniqueStockMap.values())
 
-    // 6. Supabase-Update durchführen
+    // 8. Supabase-Update durchführen
     let updatedCount = 0
     for (const item of deduplicatedStock) {
       const { error } = await supabaseAdmin
@@ -144,10 +160,10 @@ await workbook.xlsx.load(new Uint8Array(excelAttachment.content) as any)
 
     console.log(`[Email Webhook] Successo! Aggiornati ${updatedCount} prodotti da e-mail.`)
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       message: `Aggiornati ${updatedCount} prodotti con successo da allegato e-mail`,
-      sender 
+      from: emailData.from
     })
 
   } catch (err: any) {
