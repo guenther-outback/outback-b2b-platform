@@ -51,14 +51,19 @@ export async function POST(request: Request) {
 
     const emailId = emailData.email_id
 
-    // 3. Ganze E-Mail samt Anhängen über das Resend SDK abrufen
-    const { data: fullEmail, error: fetchError } = await resend.emails.get(emailId)
+ // 3. Empfangene E-Mail samt Anhängen über das Inbound/Receiving API-Modul abrufen
+    const { data: fullEmail, error: fetchError } = await resend.emails.receiving.get(emailId)
 
     if (fetchError || !fullEmail) {
-      throw new Error(`Impossibile recuperare l'email da Resend: ${fetchError?.message || 'Email non trovata'}`)
+      // Fallback: Falls attachments bereits im Webhook-Payload enthalten sind
+      if (emailData.attachments && emailData.attachments.length > 0) {
+        console.log('[Email Webhook] Verwende Webhook-Payload Attachments als Fallback.')
+      } else {
+        throw new Error(`Impossibile recuperare l'email da Resend: ${fetchError?.message || 'Email non trovata'}`)
+      }
     }
 
-    const attachments = (fullEmail as any).attachments || []
+    const attachments = fullEmail?.attachments || emailData.attachments || []
 
     // 4. Nach Excel-Anhang (.xlsx / .xls) suchen
     const excelAttachment = attachments.find((att: any) =>
