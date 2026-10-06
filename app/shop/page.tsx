@@ -167,11 +167,11 @@ export default function ShopPage() {
       </header>
 
       {/* Navigation Tabs */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex space-x-8">
+      <div className="sticky top-[49px] z-30 bg-gray-100/95 backdrop-blur-md border-b border-gray-300 shadow-sm pt-4 pb-2 mb-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex gap-4 overflow-x-auto">
           <button
             onClick={() => setActiveTab('catalog')}
-            className={`py-4 px-1 font-semibold text-sm border-b-2 transition-all flex items-center gap-2 ${
+            className={`pb-2 px-4 font-medium text-sm border-b-2 whitespace-nowrap transition-all ${
               activeTab === 'catalog'
                 ? 'border-blue-600 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-800'
@@ -182,7 +182,7 @@ export default function ShopPage() {
 
           <button
             onClick={() => setActiveTab('orders')}
-            className={`py-4 px-1 font-semibold text-sm border-b-2 transition-all flex items-center gap-2 ${
+            className={`pb-2 px-4 font-medium text-sm border-b-2 whitespace-nowrap transition-all ${
               activeTab === 'orders'
                 ? 'border-blue-600 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-800'
