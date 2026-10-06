@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       <strong>E-mail:</strong> ${customer.email}
     ` : `<strong>E-mail:</strong> ${userEmail}`
 
-    // 3. Salvataggio dell'ordine nella tabella 'orders'
+    // 3. Salvataggio dell'ordine nella tabella 'orders' (inclusa la nota/commento)
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
       .insert({
@@ -57,6 +57,7 @@ export async function POST(request: Request) {
         user_email: userEmail,
         total_amount: totalAmount,
         items: items,
+        note: note || '',
         status: 'pending'
       })
       .select()
@@ -144,7 +145,7 @@ export async function POST(request: Request) {
         </table>
 
         <div style="text-align: right; font-size: 18px; margin-top: 20px; padding-top: 10px; border-top: 2px solid #e2e8f0;">
-          <strong>Importo Totale (Netto): ${totalAmount.toFixed(2)} €</strong>
+          <strong>Importo Totale (Netto): ${Number(totalAmount).toFixed(2)} €</strong>
         </div>
 
         <p style="font-size: 12px; color: #a0aec0; margin-top: 40px; text-align: center;">
