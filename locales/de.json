@@ -37,6 +37,20 @@
     "cart_stock_split_ext": "🟠 {qty}x Ext. Lager",
     "cart_unit_price": "/ Stk.",
     "cart_subtotal": "Gesamt:",
-    "select_color": "Farbe wählen:"   
+    "select_color": "Farbe wählen:",
+    "tab_catalog": "Produktkatalog & Lagerbestand",
+    "tab_orders": "Meine Bestellungen",
+    "orders_title": "Bestellhistorie",
+    "orders_loading": "Bestellhistorie wird geladen...",
+    "orders_empty": "Keine vergangenen Bestellungen vorhanden.",
+    "orders_order_number": "Bestellung #",
+    "orders_items_count": "Bestellte Positionen",
+    "orders_status_pending": "Offen",
+    "orders_status_processing": "In Bearbeitung",
+    "orders_status_completed": "Abgeschlossen",
+    "orders_status_cancelled": "Storniert",
+    "orders_unit_price": "Stückpreis",
+    "orders_total_price": "Gesamt",
+    "orders_note_label": "Anmerkung zur Bestellung:"
   }
 }

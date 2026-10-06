@@ -37,6 +37,20 @@
     "cart_stock_split_ext": "🟠 {qty}x Magazzino Esterno",
     "cart_unit_price": "/ pz.",
     "cart_subtotal": "Totale:",
-    "select_color": "Seleziona colore:"
+    "select_color": "Seleziona colore:",
+    "tab_catalog": "Catalogo prodotti & Giacenze",
+    "tab_orders": "I miei ordini",
+    "orders_title": "Cronologia ordini",
+    "orders_loading": "Caricamento cronologia ordini...",
+    "orders_empty": "Nessun ordine passato trovato.",
+    "orders_order_number": "Ordine #",
+    "orders_items_count": "Articoli ordinati",
+    "orders_status_pending": "In attesa",
+    "orders_status_processing": "In lavorazione",
+    "orders_status_completed": "Completato",
+    "orders_status_cancelled": "Annullato",
+    "orders_unit_price": "Prezzo unitario",
+    "orders_total_price": "Totale",
+    "orders_note_label": "Nota sull'ordine:"
   }
 }

@@ -37,6 +37,20 @@
     "cart_stock_split_ext": "🟠 {qty}x External Warehouse",
     "cart_unit_price": "/ pcs.",
     "cart_subtotal": "Total:",
-    "select_color": "Select color:"
+    "select_color": "Select color:",
+    "tab_catalog": "Product Catalog & Stock",
+    "tab_orders": "My Orders",
+    "orders_title": "Order History",
+    "orders_loading": "Loading order history...",
+    "orders_empty": "No past orders found.",
+    "orders_order_number": "Order #",
+    "orders_items_count": "Ordered items",
+    "orders_status_pending": "Pending",
+    "orders_status_processing": "Processing",
+    "orders_status_completed": "Completed",
+    "orders_status_cancelled": "Cancelled",
+    "orders_unit_price": "Unit Price",
+    "orders_total_price": "Total",
+    "orders_note_label": "Order note:"
   }
 }
