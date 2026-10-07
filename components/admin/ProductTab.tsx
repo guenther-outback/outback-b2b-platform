@@ -56,7 +56,14 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
     if (error) {
       alert('Errore durante l\'aggiornamento della giacenza: ' + error.message)
     } else {
+      // Aktualisiert Daten im Hintergrund, ohne UI-Fokus zu verlieren
       loadData()
+      // Eingabe-Zustand nach Erfolg säubern
+      setStockInputs(prev => {
+        const next = { ...prev }
+        delete next[variant.id]
+        return next
+      })
     }
     setSavingStockId(null)
   }
@@ -122,6 +129,8 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
         }
         alert('Nuova variante creata!')
       }
+      
+      // Zustand nach dem Speichern erhalten!
       resetForm()
       loadData()
     } catch (err: any) {
@@ -131,7 +140,7 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
 
   const handleEditClick = (product: any, groupKey: string) => {
     setEditingId(product.id)
-    setOpenGroupKey(groupKey)
+    setOpenGroupKey(groupKey) // Hält das Akkordeon offen
     setProductForm({
       sku: product.sku,
       brand: product.brand,
@@ -175,7 +184,7 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      {/* Form Creazione / Modifica (Nicht mehr sticky auf Mobilgeräten) */}
+      {/* Form Creazione / Modifica */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 lg:sticky lg:top-24 lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-bold text-lg text-gray-800">{editingId ? 'Modifica Variante' : 'Crea Variante Prodotto'}</h2>
@@ -275,7 +284,7 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
         </form>
       </div>
 
-      {/* Suche & Helle Akkordeon-Produktboxen */}
+      {/* Suche & Akkordeon-Produktboxen */}
       <div className="lg:col-span-2 space-y-4">
         <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 flex items-center gap-3">
           <span className="text-gray-400 pl-1">🔍</span>
@@ -306,9 +315,9 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
             return (
               <div
                 key={groupKey}
-                className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col justify-between hover:shadow-md transition relative group z-10 hover:z-30 overflow-visible"
-              >       
-                 {/* Helles Header-Design per il Modello */}
+                className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col justify-between transition relative overflow-hidden"
+              >     
+                {/* Header-Design */}
                 <button
                   onClick={() => toggleGroup(groupKey)}
                   className="w-full p-4 bg-white hover:bg-slate-50 text-gray-800 flex justify-between items-center text-left transition"
