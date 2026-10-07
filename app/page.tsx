@@ -86,49 +86,69 @@ export default function B2BLinktreePage() {
       </div>
 
       {/* Rechte Spalte: Die B2B Link-Liste im Swiss-Brutalist Stil */}
-      <div className="w-full md:w-7/12 p-8 sm:p-12 md:p-16 flex flex-col justify-center bg-white">
-        <div className="mb-6">
-          <span className="text-xs font-bold tracking-widest text-gray-400 uppercase">
-            // SELEZIONA PORTALE B2B
-          </span>
+      <div className="w-full md:w-7/12 p-8 sm:p-12 md:p-16 flex flex-col justify-between bg-white">
+        <div>
+          <div className="mb-6">
+            <span className="text-xs font-bold tracking-widest text-gray-400 uppercase">
+              // SELEZIONA PORTALE B2B
+            </span>
+          </div>
+
+          <nav className="flex flex-col space-y-4 sm:space-y-5">
+            {b2bLinks.map((item, idx) => {
+              const Content = (
+                <div className={`group relative p-4 sm:p-5 border-2 transition-all duration-150 flex items-center justify-between ${
+                  item.highlight 
+                    ? 'border-black bg-black text-white hover:bg-white hover:text-black' 
+                    : 'border-black/10 hover:border-black bg-white text-black'
+                }`}>
+                  <div>
+                    <div className="text-lg sm:text-xl font-black tracking-wider uppercase group-hover:translate-x-1 transition-transform duration-150">
+                      {item.title}
+                    </div>
+                    <div className={`text-xs mt-1 font-medium tracking-wide ${
+                      item.highlight ? 'text-gray-300 group-hover:text-gray-600' : 'text-gray-500'
+                    }`}>
+                      {item.brands}
+                    </div>
+                  </div>
+
+                  <div className="text-xl font-bold ml-4 group-hover:translate-x-1 transition-transform duration-150">
+                    ➔
+                  </div>
+                </div>
+              )
+
+              return item.isInternal ? (
+                <Link key={idx} href={item.url}>
+                  {Content}
+                </Link>
+              ) : (
+                <a key={idx} href={item.url} target="_blank" rel="noopener noreferrer">
+                  {Content}
+                </a>
+              )
+            })}
+          </nav>
         </div>
 
-        <nav className="flex flex-col space-y-4 sm:space-y-5">
-          {b2bLinks.map((item, idx) => {
-            const Content = (
-              <div className={`group relative p-4 sm:p-5 border-2 transition-all duration-150 flex items-center justify-between ${
-                item.highlight 
-                  ? 'border-black bg-black text-white hover:bg-white hover:text-black' 
-                  : 'border-black/10 hover:border-black bg-white text-black'
-              }`}>
-                <div>
-                  <div className="text-lg sm:text-xl font-black tracking-wider uppercase group-hover:translate-x-1 transition-transform duration-150">
-                    {item.title}
-                  </div>
-                  <div className={`text-xs mt-1 font-medium tracking-wide ${
-                    item.highlight ? 'text-gray-300 group-hover:text-gray-600' : 'text-gray-500'
-                  }`}>
-                    {item.brands}
-                  </div>
-                </div>
-
-                <div className="text-xl font-bold ml-4 group-hover:translate-x-1 transition-transform duration-150">
-                  ➔
-                </div>
-              </div>
-            )
-
-            return item.isInternal ? (
-              <Link key={idx} href={item.url}>
-                {Content}
-              </Link>
-            ) : (
-              <a key={idx} href={item.url} target="_blank" rel="noopener noreferrer">
-                {Content}
-              </a>
-            )
-          })}
-        </nav>
+        {/* Support & Access Button ganz unten */}
+        <div className="mt-10 pt-6 border-t border-gray-100">
+          <a
+            href="mailto:info@outback.it?subject=Richiesta%20accesso%20/%20assistenza%20B2B"
+            className="group w-full p-4 border border-dashed border-gray-400 hover:border-black hover:bg-gray-50 transition-all duration-150 flex items-center justify-between text-black"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-base">✉️</span>
+              <span className="text-sm font-bold tracking-wider uppercase">
+                RICHIEDI ACCESSO / ASSISTENZA
+              </span>
+            </div>
+            <span className="text-xs font-mono text-gray-500 group-hover:text-black transition-colors">
+              info@outback.it ➔
+            </span>
+          </a>
+        </div>
       </div>
     </div>
   )
