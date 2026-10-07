@@ -194,34 +194,34 @@ export default function ProductCatalog({
             return (
               <div
                 key={groupKey}
-                className="relative bg-white rounded-lg shadow-sm border border-gray-200 overflow-visible flex flex-col justify-between hover:shadow-md transition z-10 hover:z-30"
+                className="relative bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col justify-between hover:shadow-md transition z-10"
               >
-              {/* Produktbild mit natürlicher Hover-Vorschau direkt über dem Bild */}
-              <div className="group h-48 bg-gray-100 flex items-center justify-center border-b border-gray-100 relative rounded-t-lg">
-                {activeVariant.image_url ? (
-                  <>
-                    {/* Normales Kartenbild */}
-                    <img
-                      src={activeVariant.image_url}
-                      alt={`${mainItem.title} ${currentColor}`}
-                      className="w-full h-full object-contain p-4 cursor-pointer transition-transform duration-200 group-hover:scale-105"
-                    />
-
-                    {/* Große Hover-Vorschau: Zentriert über dem Bild, aber wächst sauber nach unten/seitlich auf */}
-                    <div className="hidden md:group-hover:flex absolute top-0 left-1/2 -translate-x-1/2 w-[380px] h-[380px] bg-white p-5 rounded-2xl shadow-2xl border border-gray-300 z-50 pointer-events-none items-center justify-center transition-all animate-in fade-in zoom-in-95 duration-150">
+                {/* Bild-Container */}
+                <div className="h-48 bg-gray-100 flex items-center justify-center border-b border-gray-100 relative rounded-t-lg">
+                  {activeVariant.image_url ? (
+                    <div className="group relative w-full h-full flex items-center justify-center">
+                      {/* Normales Produktbild (Hover ist NUR auf diesem Element getriggert) */}
                       <img
                         src={activeVariant.image_url}
-                        alt={`${mainItem.title} preview`}
-                        className="max-w-full max-h-full object-contain drop-shadow-md"
+                        alt={`${mainItem.title} ${currentColor}`}
+                        className="w-full h-full object-contain p-4 cursor-pointer transition-transform duration-200 group-hover:scale-105"
                       />
+
+                      {/* Große Hover-Vorschau: erscheint NUR beim direkten Fahren über das Bild */}
+                      <div className="hidden md:group-hover:flex absolute top-0 left-1/2 -translate-x-1/2 w-[360px] h-[360px] bg-white p-5 rounded-2xl shadow-2xl border border-gray-300 z-40 pointer-events-none items-center justify-center transition-all animate-in fade-in zoom-in-95 duration-150">
+                        <img
+                          src={activeVariant.image_url}
+                          alt={`${mainItem.title} preview`}
+                          className="max-w-full max-h-full object-contain drop-shadow-md"
+                        />
+                      </div>
                     </div>
-                  </>
-                ) : (
-                  <div className="text-gray-600 text-xs font-semibold flex flex-col items-center gap-1">
-                    <span>📷 Kein Bild für diese Farbe</span>
-                  </div>
-                )}
-              </div>
+                  ) : (
+                    <div className="text-gray-600 text-xs font-semibold flex flex-col items-center gap-1">
+                      <span>📷 Kein Bild für diese Farbe</span>
+                    </div>
+                  )}
+                </div>
 
                 {/* Produktdetails */}
                 <div className="p-5 flex-1 flex flex-col justify-between">
