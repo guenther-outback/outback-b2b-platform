@@ -104,57 +104,57 @@ export default function ShopPage() {
     window.location.href = '/'
   }
 
+  const totalCartCount = cart.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <header className="bg-slate-900/95 backdrop-blur-md text-slate-100 sticky top-0 z-30 border-b border-slate-800/80 shadow-sm transition-all">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <a href="/shop" className="text-base sm:text-lg font-semibold tracking-tight text-white hover:opacity-90 transition">
-              OUTBACK <span className="text-xs font-normal text-slate-300 uppercase tracking-widest ml-1">B2B</span>
+      {/* KOMBILIERTER STICKY HEADER FÜR MOBIL & DESKTOP */}
+      <header className="bg-slate-900/95 backdrop-blur-md text-slate-100 sticky top-0 z-50 border-b border-slate-800 shadow-md">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-2">
+          {/* Logo */}
+          <div className="flex items-center gap-2 shrink-0">
+            <a href="/shop" className="text-sm sm:text-lg font-bold tracking-tight text-white hover:opacity-90">
+              OUTBACK <span className="text-[10px] sm:text-xs font-normal text-slate-300 uppercase tracking-widest ml-0.5">B2B</span>
             </a>
-            {userEmail && (
-              <>
-                <span className="hidden sm:inline text-slate-700">|</span>
-                <span className="hidden sm:inline text-xs text-slate-300 font-medium truncate max-w-[200px]" title={userEmail}>
-                  {userEmail}
-                </span>
-              </>
-            )}
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
-            <LanguageSwitcher />
+          {/* Rechte Steuerungs-Buttons (Kompakt auf Mobile) */}
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+            <div className="scale-90 sm:scale-100 origin-right">
+              <LanguageSwitcher />
+            </div>
 
             {isAdmin && (
               <a 
                 href="/admin" 
-                className="text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5"
+                className="text-xs font-medium text-slate-300 hover:text-white bg-slate-800 border border-slate-700 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg transition"
                 title="Admin Dashboard"
               >
                 <span className="text-purple-400 text-xs">⚙️</span>
-                <span className="hidden sm:inline">Admin</span>
+                <span className="hidden sm:inline ml-1">Admin</span>
               </a>
             )}
 
+            {/* Warenkorb Button */}
             <button
               onClick={() => setIsCartOpen(true)}
-              className="relative text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 shadow-sm"
+              className="relative text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
               <span className="hidden sm:inline">{t('shop.cart')}</span>
-              {cart.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0) > 0 && (
+              {totalCartCount > 0 && (
                 <span className="bg-white text-blue-700 text-[10px] font-bold rounded-full h-4 min-w-[16px] px-1 flex items-center justify-center">
-                  {cart.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)}
+                  {totalCartCount}
                 </span>
               )}
             </button>
 
+            {/* Logout Button */}
             <button 
               onClick={handleLogout} 
-              className="text-xs text-slate-300 hover:text-slate-200 transition-colors p-1 ml-1"
+              className="text-xs text-slate-300 hover:text-white p-1"
               title={t('shop.logout')}
             >
               <svg className="w-4 h-4 sm:hidden" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -164,37 +164,37 @@ export default function ShopPage() {
             </button>
           </div>
         </div>
+
+        {/* TAB-NAVIGATION DIREKT IN DEN HEADER INTEGRIERT (VERHINDERT DOPPELTEN STICKY-ABSTAND) */}
+        <div className="bg-slate-900 border-t border-slate-800/80 px-3 sm:px-6">
+          <div className="max-w-7xl mx-auto flex gap-2 sm:gap-6 overflow-x-auto text-xs sm:text-sm">
+            <button
+              onClick={() => setActiveTab('catalog')}
+              className={`py-2 px-3 font-medium border-b-2 whitespace-nowrap transition-all ${
+                activeTab === 'catalog'
+                  ? 'border-blue-500 text-blue-400 font-bold'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <span className="mr-1">🛍️</span>{t('shop.tab_catalog')}
+            </button>
+
+            <button
+              onClick={() => setActiveTab('orders')}
+              className={`py-2 px-3 font-medium border-b-2 whitespace-nowrap transition-all ${
+                activeTab === 'orders'
+                  ? 'border-blue-500 text-blue-400 font-bold'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <span className="mr-1">📦</span>{t('shop.tab_orders')}
+            </button>
+          </div>
+        </div>
       </header>
 
-      {/* Navigation Tabs */}
-      <div className="sticky top-[49px] z-30 bg-gray-100/95 backdrop-blur-md border-b border-gray-300 shadow-sm pt-4 pb-2 mb-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex gap-4 overflow-x-auto">
-          <button
-            onClick={() => setActiveTab('catalog')}
-            className={`pb-2 px-4 font-medium text-sm border-b-2 whitespace-nowrap transition-all ${
-              activeTab === 'catalog'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            <span>🛍️</span>{t('shop.tab_catalog')}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('orders')}
-            className={`pb-2 px-4 font-medium text-sm border-b-2 whitespace-nowrap transition-all ${
-              activeTab === 'orders'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            <span>📦</span>{t('shop.tab_orders')}
-          </button>
-        </div>
-      </div>
-
       {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 py-8 flex-1 w-full">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8 flex-1 w-full">
         {activeTab === 'catalog' && (
           <ProductCatalog
             products={products}
