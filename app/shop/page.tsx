@@ -5,9 +5,9 @@ import { createClient } from '@/lib/supabaseClient'
 import { useCart } from '@/context/CartContext'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { useLanguage } from '@/context/LanguageContext'
-import QuantityInput from '@/components/QuantityInput'
 import OrderHistoryTab from '@/components/OrderHistoryTab'
 import ProductCatalog from '@/components/ProductCatalog'
+import CartDrawer from '@/components/CartDrawer'
 
 export default function ShopPage() {
   const [products, setProducts] = useState<any[]>([])
@@ -23,7 +23,7 @@ export default function ShopPage() {
   const [activeTab, setActiveTab] = useState<'catalog' | 'orders'>('catalog')
 
   const { t } = useLanguage()
-  const { cart, addToCart, removeFromCart, updateQuantity, clearCart, totalAmount } = useCart()
+  const { cart, addToCart, removeFromCart, updateQuantity, clearCart } = useCart()
   const supabase = createClient()
 
   const fetchProducts = async () => {
@@ -62,7 +62,7 @@ export default function ShopPage() {
     fetchProducts()
   }, [])
 
-  const handleCheckout = async () => {
+  const handleCheckout = async (shippingCost: number, grandTotal: number) => {
     if (cart.length === 0 || orderSubmitting) return
 
     setOrderSubmitting(true)
@@ -73,7 +73,8 @@ export default function ShopPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: cart,
-          totalAmount,
+          shippingCost,
+          totalAmount: grandTotal,
           userEmail,
           note: orderNote,
         }),
@@ -90,7 +91,6 @@ export default function ShopPage() {
       setOrderSuccess(true)
 
       await fetchProducts()
-
     } catch (error: any) {
       console.error('Checkout Fehler:', error)
       alert(`Bestellung konnte nicht verarbeitet werden: ${error.message}`)
@@ -209,129 +209,21 @@ export default function ShopPage() {
         {activeTab === 'orders' && <OrderHistoryTab />}
       </main>
 
-      {/* Warenkorb Sidebar */}
-      {isCartOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-end">
-          <div className="bg-white w-full max-w-md h-full flex flex-col p-6 shadow-xl">
-            <div className="flex justify-between items-center border-b pb-4 mb-4">
-              <h2 className="text-lg font-bold text-gray-900">{t('shop.cart')}</h2>
-              <button onClick={() => { setIsCartOpen(false); setOrderSuccess(false); }} className="text-gray-600 hover:text-black font-bold">✕</button>
-            </div>
-
-            {orderSuccess ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center">
-                <span className="text-4xl mb-2">✅</span>
-                <h3 className="text-xl font-bold text-green-600 mb-2">{t('shop.order_success_title')}</h3>
-                <p className="text-sm text-gray-600 mb-6">{t('shop.order_success_sub')}</p>
-                <button
-                  onClick={() => { setOrderSuccess(false); setIsCartOpen(false); }}
-                  className="bg-slate-900 text-white px-4 py-2 rounded text-sm font-medium"
-                >
-                  {t('shop.back_to_shop')}
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="flex-1 overflow-y-auto space-y-4">
-                  {cart.length === 0 ? (
-                    <p className="text-gray-600 font-medium text-center py-8">{t('shop.empty_cart')}</p>
-                  ) : (
-                    cart.map((item) => {
-                      const itemEkPrice = item.price_ek || item.price_vk || 0
-                      const itemSubtotal = itemEkPrice * item.quantity
-
-                      const qty = Number(item.quantity) || 1
-                      const stockMain = Number(item.stock_main) || 0
-                      const mainQty = Math.min(stockMain, qty)
-                      const extQty = Math.max(0, qty - mainQty)
-
-                      return (
-                        <div key={item.id} className="flex justify-between items-center border-b pb-3 gap-2">
-                          <div>
-                            <div className="font-bold text-sm text-gray-900">{item.brand} {item.title}</div>
-                            <div className="text-xs text-gray-600 font-medium">
-                              SKU: {item.sku} {item.color && `| ${item.color}`} {item.length && `| ${item.length}`}
-                            </div>
-
-                            <div className="text-[11px] font-medium mt-0.5">
-                              {mainQty > 0 && extQty > 0 ? (
-                                <span className="text-blue-600 font-semibold">
-                                  {t('shop.cart_stock_split_both')
-                                    .replace('{main}', String(mainQty))
-                                    .replace('{ext}', String(extQty))}
-                                </span>
-                              ) : mainQty > 0 ? (
-                                <span className="text-emerald-700 font-semibold">
-                                  {t('shop.cart_stock_split_main').replace('{qty}', String(qty))}
-                                </span>
-                              ) : (
-                                <span className="text-amber-700 font-semibold">
-                                  {t('shop.cart_stock_split_ext').replace('{qty}', String(qty))}
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="text-xs text-blue-600 font-bold mt-0.5">
-                              {itemEkPrice.toFixed(2)} € <span className="text-gray-600 font-normal">{t('shop.cart_unit_price')}</span>
-                              <span className="text-gray-700 font-bold ml-2">({t('shop.cart_subtotal')} {itemSubtotal.toFixed(2)} €)</span>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0">
-                            <QuantityInput
-                              value={item.quantity || 1}
-                              min={1}
-                              onChange={(newQty) => updateQuantity(item.id, newQty)}
-                            />
-
-                            <button 
-                              onClick={() => removeFromCart(item.id)} 
-                              className="text-red-500 text-xs hover:underline p-1 font-bold"
-                              title={t('shop.cart_remove_item')}
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
-
-                {cart.length > 0 && (
-                  <div className="border-t pt-4 mt-4 space-y-4">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        {t('shop.cart_note_label')}
-                      </label>
-                      <textarea
-                        rows={2}
-                        value={orderNote}
-                        onChange={(e) => setOrderNote(e.target.value)}
-                        placeholder={t('shop.cart_note_placeholder')}
-                        className="w-full p-2 border border-gray-300 rounded text-xs text-gray-800 focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-
-                    <div className="flex justify-between text-lg font-bold text-gray-900">
-                      <span>{t('shop.total')}:</span>
-                      <span>{totalAmount.toFixed(2)} €</span>
-                    </div>
-
-                    <button
-                      onClick={handleCheckout}
-                      disabled={orderSubmitting}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded text-center transition disabled:opacity-50"
-                    >
-                      {orderSubmitting ? '...' : t('shop.checkout_btn')}
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Ausgelagertes Cart Drawer Modul */}
+      <CartDrawer
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        cart={cart}
+        updateQuantity={updateQuantity}
+        removeFromCart={removeFromCart}
+        orderNote={orderNote}
+        setOrderNote={setOrderNote}
+        handleCheckout={handleCheckout}
+        orderSubmitting={orderSubmitting}
+        orderSuccess={orderSuccess}
+        setOrderSuccess={setOrderSuccess}
+        t={t}
+      />
     </div>
   )
 }

@@ -51,6 +51,17 @@
     "orders_status_cancelled": "Cancelled",
     "orders_unit_price": "Unit Price",
     "orders_total_price": "Total",
-    "orders_note_label": "Order note:"
+    "orders_note_label": "Order note:",
+    "cart_subtotal_items": "Items Subtotal",
+    "cart_shipping_costs": "Shipping Costs",
+    "cart_total_net": "Total (net)",
+    "shipping_detail_title": "Shipping Cost Details:",
+    "shipping_no_costs": "No shipping costs applied.",
+    "shipping_min_order_error": "Minimum order quantity not reached:",
+    "shipping_free": "Free Shipping",
+    "shipping_missing_for_free": "{amount} € remaining for free shipping",
+    "shipping_main_warehouse": "Main Warehouse",
+    "min_order_akta": "Akta: minimum order 20 pcs (currently: {qty} pcs).",
+    "min_order_suno": "Suno: minimum order 6 pcs (currently: {qty} pcs)."
   }
 }

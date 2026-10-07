@@ -11,7 +11,7 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request: Request) {
   try {
-    const { items, totalAmount, userEmail, note } = await request.json()
+    const { items, shippingCost = 0, totalAmount, userEmail, note } = await request.json()
 
     if (!items || items.length === 0 || !userEmail) {
       return NextResponse.json({ error: 'Dati ordine non validi' }, { status: 400 })
@@ -49,13 +49,23 @@ export async function POST(request: Request) {
       <strong>E-mail:</strong> ${customer.email}
     ` : `<strong>E-mail:</strong> ${userEmail}`
 
-    // 3. Salvataggio dell'ordine nella tabella 'orders' (inclusa la nota/commento)
+    // Subtotale netto prodotti
+    const subtotal = items.reduce((sum: number, item: any) => {
+      const price = Number(item.price_ek) || Number(item.price_vk) || 0
+      return sum + price * (Number(item.quantity) || 1)
+    }, 0)
+
+    const finalShippingCost = Number(shippingCost) || 0
+    const finalTotalAmount = Number(totalAmount) || (subtotal + finalShippingCost)
+
+    // 3. Salvataggio dell'ordine nella tabella 'orders' (inclusa la nota e le spese di spedizione)
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
       .insert({
         customer_id: customer?.id || null,
         user_email: userEmail,
-        total_amount: totalAmount,
+        total_amount: finalTotalAmount,
+        shipping_cost: finalShippingCost,
         items: items,
         note: note || '',
         status: 'pending'
@@ -67,7 +77,7 @@ export async function POST(request: Request) {
 
     if (order) {
       const orderItems = items.map((item: any) => {
-        const price = item.price_ek || item.price_vk || 0
+        const price = Number(item.price_ek) || Number(item.price_vk) || 0
         return {
           order_id: order.id,
           product_id: item.id,
@@ -80,7 +90,7 @@ export async function POST(request: Request) {
 
     // 4. Generazione della tabella HTML per l'email in italiano (con ripartizione dei magazzini)
     const itemsHtml = items.map((item: any) => {
-      const itemEkPrice = item.price_ek || item.price_vk || 0
+      const itemEkPrice = Number(item.price_ek) || Number(item.price_vk) || 0
       const qty = Number(item.quantity) || 1
       const stockMain = Number(item.stock_main) || 0
 
@@ -144,8 +154,24 @@ export async function POST(request: Request) {
           </tbody>
         </table>
 
-        <div style="text-align: right; font-size: 18px; margin-top: 20px; padding-top: 10px; border-top: 2px solid #e2e8f0;">
-          <strong>Importo Totale (Netto): ${Number(totalAmount).toFixed(2)} €</strong>
+        <!-- Tabella Riepilogo Prezzi & Spedizione -->
+        <div style="width: 100%; font-size: 14px; margin-top: 20px; padding-top: 10px; border-top: 2px solid #e2e8f0;">
+          <table style="width: 100%;">
+            <tr>
+              <td style="text-align: right; padding: 4px 0; color: #4a5568;">Subtotale articoli:</td>
+              <td style="text-align: right; padding: 4px 0; width: 120px;"><strong>${subtotal.toFixed(2)} €</strong></td>
+            </tr>
+            <tr>
+              <td style="text-align: right; padding: 4px 0; color: #4a5568;">Spese di trasporto:</td>
+              <td style="text-align: right; padding: 4px 0; width: 120px;">
+                <strong>${finalShippingCost === 0 ? 'Porto Franco (0.00 €)' : `${finalShippingCost.toFixed(2)} €`}</strong>
+              </td>
+            </tr>
+            <tr style="font-size: 18px; color: #1a365d;">
+              <td style="text-align: right; padding: 10px 0 0 0; font-weight: bold;">Importo Totale (Netto):</td>
+              <td style="text-align: right; padding: 10px 0 0 0; font-weight: bold; width: 120px;">${finalTotalAmount.toFixed(2)} €</td>
+            </tr>
+          </table>
         </div>
 
         <p style="font-size: 12px; color: #a0aec0; margin-top: 40px; text-align: center;">

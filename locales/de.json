@@ -51,6 +51,17 @@
     "orders_status_cancelled": "Storniert",
     "orders_unit_price": "Stückpreis",
     "orders_total_price": "Gesamt",
-    "orders_note_label": "Anmerkung zur Bestellung:"
+    "orders_note_label": "Anmerkung zur Bestellung:",
+    "cart_subtotal_items": "Zwischensumme Artikel",
+    "cart_shipping_costs": "Versandkosten",
+    "cart_total_net": "Gesamtsumme (netto)",
+    "shipping_detail_title": "Versandkosten-Details:",
+    "shipping_no_costs": "Keine Versandkosten angewendet.",
+    "shipping_min_order_error": "Mindestbestellmenge nicht erreicht:",
+    "shipping_free": "Versandkostenfrei (Porto Franco)",
+    "shipping_missing_for_free": "Fehlen {amount} € für versandkostenfrei",
+    "shipping_main_warehouse": "Hauptlager",
+    "min_order_akta": "Akta: Mindestbestellmenge 20 Stk. (Aktuell: {qty} Stk.)",
+    "min_order_suno": "Suno: Mindestbestellmenge 6 Stk. (Aktuell: {qty} Stk.)"
   }
 }

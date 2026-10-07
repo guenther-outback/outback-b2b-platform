@@ -51,6 +51,17 @@
     "orders_status_cancelled": "Annullato",
     "orders_unit_price": "Prezzo unitario",
     "orders_total_price": "Totale",
-    "orders_note_label": "Nota sull'ordine:"
+    "orders_note_label": "Nota sull'ordine:",
+    "cart_subtotal_items": "Subtotale articoli",
+    "cart_shipping_costs": "Spese di trasporto",
+    "cart_total_net": "Totale (netto)",
+    "shipping_detail_title": "Dettaglio Spese Spedizione:",
+    "shipping_no_costs": "Nessuna spesa applicata.",
+    "shipping_min_order_error": "Minimo d'ordine non raggiunto:",
+    "shipping_free": "Porto Franco",
+    "shipping_missing_for_free": "Mancano {amount} € per Porto Franco",
+    "shipping_main_warehouse": "Magazzino Principale",
+    "min_order_akta": "Akta: ordine minimo 20 pz (attualmente: {qty} pz).",
+    "min_order_suno": "Suno: ordine minimo 6 pz (attualmente: {qty} pz)."
   }
 }
