@@ -208,7 +208,7 @@ export default function ProductCatalog({
                       />
 
                       {/* Große Hover-Vorschau: erscheint NUR beim direkten Fahren über das Bild */}
-                      <div className="hidden md:group-hover:flex absolute top-0 left-1/2 -translate-x-1/2 w-[360px] h-[360px] bg-white p-5 rounded-2xl shadow-2xl border border-gray-300 z-40 pointer-events-none items-center justify-center transition-all animate-in fade-in zoom-in-95 duration-150">
+                      <div className="hidden md:group-hover:flex absolute top-3 left-1/2 -translate-x-1/2 w-[360px] h-[360px] bg-white p-5 rounded-2xl shadow-2xl border border-gray-300 z-40 pointer-events-none items-center justify-center transition-all animate-in fade-in zoom-in-95 duration-150">
                         <img
                           src={activeVariant.image_url}
                           alt={`${mainItem.title} preview`}

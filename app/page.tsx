@@ -4,7 +4,7 @@ export default function B2BLinktreePage() {
   const b2bLinks = [
     {
       title: 'OUTBACK B2B PORTAL',
-      brands: 'Flaxta, DPS, Kang, Akta, Suno',
+      brands: 'Flaxta, DPS, Kang, Akta, Suno, ULL Ski',
       url: '/shop',
       isInternal: true,
       highlight: true,
