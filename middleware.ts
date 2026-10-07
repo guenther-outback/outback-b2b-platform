@@ -35,10 +35,10 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // Öffentliche Pfade
-  const isPublicRoute = pathname === '/login' || pathname.startsWith('/api')
+  // Öffentliche Pfade (Hauptseite Linktree '/', Login & API-Routen)
+  const isPublicRoute = pathname === '/' || pathname === '/login' || pathname.startsWith('/api')
 
-  // Regel 1: Nicht eingeloggt -> Zugriff auf geschützte Pfade blockieren
+  // Regel 1: Nicht eingeloggt -> Zugriff auf geschützte Pfade (/shop, /admin) blockieren
   if (!user && !isPublicRoute) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
@@ -57,8 +57,9 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Regel 3: Bereits eingeloggt & besucht '/login' oder '/' -> Umleitung zum Shop
-  if (user && (pathname === '/login' || pathname === '/')) {
+  // Regel 3: Bereits eingeloggt & besucht '/login' -> Umleitung zum Shop
+  // (Hauptseite '/' bleibt auch für Eingeloggte erreichbar, um andere B2B-Links zu wählen)
+  if (user && pathname === '/login') {
     return NextResponse.redirect(new URL('/shop', request.url))
   }
 
