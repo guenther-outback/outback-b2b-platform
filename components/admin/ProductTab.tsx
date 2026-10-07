@@ -40,6 +40,7 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
     }))
   }
 
+  // Bestände direkt in Supabase & lokal aktualisieren OHNE loadData()
   const handleSaveStock = async (variant: any) => {
     const inputs = stockInputs[variant.id]
     if (!inputs) return
@@ -56,9 +57,10 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
     if (error) {
       alert('Errore durante l\'aggiornamento della giacenza: ' + error.message)
     } else {
-      // Aktualisiert Daten im Hintergrund, ohne UI-Fokus zu verlieren
-      loadData()
-      // Eingabe-Zustand nach Erfolg säubern
+      // Direktes lokales Update der Daten für sofortige Reaktion ohne Reload
+      variant.stock_main = inputs.main
+      variant.stock_external = inputs.ext
+
       setStockInputs(prev => {
         const next = { ...prev }
         delete next[variant.id]
@@ -99,6 +101,7 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
     setUploadingImage(false)
   }
 
+  // Produkt-Variante speichern OHNE loadData(), damit Akkordeon & Suche nicht zurückgesetzt werden
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
@@ -114,9 +117,16 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
             .eq('title', productForm.title)
             .eq('color', productForm.color)
         }
-        alert('Variante aggiornata con successo!')
+
+        // Aktualisiert lokale Objekte im geöffneten Akkordeon-Array direkt
+        if (openGroupKey && groupedProducts[openGroupKey]) {
+          const itemIdx = groupedProducts[openGroupKey].findIndex(v => v.id === editingId)
+          if (itemIdx !== -1) {
+            groupedProducts[openGroupKey][itemIdx] = { ...groupedProducts[openGroupKey][itemIdx], ...productForm }
+          }
+        }
       } else {
-        const { error } = await supabase.from('products').insert([productForm])
+        const { data, error } = await supabase.from('products').insert([productForm]).select().single()
         if (error) throw error
 
         if (applyImageToSameColor && productForm.color && productForm.image_url) {
@@ -127,12 +137,13 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
             .eq('title', productForm.title)
             .eq('color', productForm.color)
         }
-        alert('Nuova variante creata!')
+
+        // Falls ein neues Produkt angelegt wurde, laden wir im Hintergrund nach
+        loadData()
       }
-      
-      // Zustand nach dem Speichern erhalten!
-      resetForm()
-      loadData()
+
+      setEditingId(null)
+      alert('Variante salvata con successo!')
     } catch (err: any) {
       alert('Errore durante il salvataggio: ' + err.message)
     }
@@ -140,7 +151,7 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
 
   const handleEditClick = (product: any, groupKey: string) => {
     setEditingId(product.id)
-    setOpenGroupKey(groupKey) // Hält das Akkordeon offen
+    setOpenGroupKey(groupKey) // Hält das entsprechende Akkordeon offen
     setProductForm({
       sku: product.sku,
       brand: product.brand,
@@ -156,10 +167,14 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
     })
   }
 
-  const handleDeleteProduct = async (id: string) => {
+  const handleDeleteProduct = async (id: string, groupKey: string) => {
     if (!confirm('Eliminare veramente la variante?')) return
     await supabase.from('products').delete().eq('id', id)
-    loadData()
+
+    // Entferne es lokal aus dem Gruppenarray
+    if (groupedProducts[groupKey]) {
+      groupedProducts[groupKey] = groupedProducts[groupKey].filter(v => v.id !== id)
+    }
   }
 
   const resetForm = () => {
@@ -307,6 +322,8 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
         ) : (
           filteredGroupKeys.map(groupKey => {
             const variants = groupedProducts[groupKey]
+            if (!variants || variants.length === 0) return null
+
             const main = variants[0]
             const totalMainStock = variants.reduce((sum, v) => sum + (v.stock_main || 0), 0)
             const totalExtStock = variants.reduce((sum, v) => sum + (v.stock_external || 0), 0)
@@ -317,7 +334,7 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
                 key={groupKey}
                 className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col justify-between transition relative overflow-hidden"
               >     
-                {/* Header-Design */}
+                {/* Header-Design per il Modello */}
                 <button
                   onClick={() => toggleGroup(groupKey)}
                   className="w-full p-4 bg-white hover:bg-slate-50 text-gray-800 flex justify-between items-center text-left transition"
@@ -413,7 +430,7 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
                                   </button>
                                 )}
                                 <button onClick={() => handleEditClick(v, groupKey)} className="p-1 text-slate-500 hover:text-blue-600 text-sm" title="Modifica variante">✏️</button>
-                                <button onClick={() => handleDeleteProduct(v.id)} className="p-1 text-red-400 hover:text-red-600 text-sm" title="Elimina variante">✕</button>
+                                <button onClick={() => handleDeleteProduct(v.id, groupKey)} className="p-1 text-red-400 hover:text-red-600 text-sm" title="Elimina variante">✕</button>
                               </td>
                             </tr>
                           )
