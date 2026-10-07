@@ -196,7 +196,7 @@ export default function ProductCatalog({
                 key={groupKey}
                 className="relative bg-white rounded-lg shadow-sm border border-gray-200 overflow-visible flex flex-col justify-between hover:shadow-md transition z-10 hover:z-30"
               >
-              {/* Produktbild mit optimierter Hover-Vorschau */}
+              {/* Produktbild mit natürlicher Hover-Vorschau direkt über dem Bild */}
               <div className="group h-48 bg-gray-100 flex items-center justify-center border-b border-gray-100 relative rounded-t-lg">
                 {activeVariant.image_url ? (
                   <>
@@ -207,8 +207,8 @@ export default function ProductCatalog({
                       className="w-full h-full object-contain p-4 cursor-pointer transition-transform duration-200 group-hover:scale-105"
                     />
 
-                    {/* Große Hover-Vorschau (Richtet sich von der Oberkante des Bildes nach unten/rechts aus) */}
-                    <div className="hidden md:group-hover:flex absolute top-0 left-full ml-2 w-[380px] h-[380px] bg-white p-5 rounded-2xl shadow-2xl border border-gray-300 z-20 pointer-events-none items-center justify-center transition-all animate-in fade-in zoom-in-95 duration-150">
+                    {/* Große Hover-Vorschau: Zentriert über dem Bild, aber wächst sauber nach unten/seitlich auf */}
+                    <div className="hidden md:group-hover:flex absolute top-0 left-1/2 -translate-x-1/2 w-[380px] h-[380px] bg-white p-5 rounded-2xl shadow-2xl border border-gray-300 z-50 pointer-events-none items-center justify-center transition-all animate-in fade-in zoom-in-95 duration-150">
                       <img
                         src={activeVariant.image_url}
                         alt={`${mainItem.title} preview`}
