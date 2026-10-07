@@ -194,10 +194,10 @@ export default function ProductCatalog({
             return (
               <div
                 key={groupKey}
-                className="group relative bg-white rounded-lg shadow-sm border border-gray-200 overflow-visible flex flex-col justify-between hover:shadow-md transition z-10 hover:z-30"
+                className="relative bg-white rounded-lg shadow-sm border border-gray-200 overflow-visible flex flex-col justify-between hover:shadow-md transition z-10 hover:z-30"
               >
-                {/* Produktbild mit Hover-Zoom Vorschau */}
-                <div className="h-48 bg-gray-100 flex items-center justify-center border-b border-gray-100 relative rounded-t-lg">
+                {/* Produktbild mit Hover-Zoom Vorschau (NUR auf diesem Div ist 'group' aktiv) */}
+                <div className="group h-48 bg-gray-100 flex items-center justify-center border-b border-gray-100 relative rounded-t-lg">
                   {activeVariant.image_url ? (
                     <>
                       {/* Normales Kartenbild */}
@@ -207,7 +207,7 @@ export default function ProductCatalog({
                         className="w-full h-full object-contain p-4 cursor-pointer transition-transform duration-200 group-hover:scale-105"
                       />
 
-                      {/* Große Hover-Vorschau (Nur auf Desktop `md:`, zentriert und schwebend) */}
+                      {/* Große Hover-Vorschau (reagiert AUSSCHLIESSLICH beim Hovern über dem Bild) */}
                       <div className="hidden md:group-hover:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] h-[420px] bg-white p-6 rounded-2xl shadow-2xl border border-gray-300 z-50 pointer-events-none items-center justify-center transition-all animate-in fade-in zoom-in-95 duration-150">
                         <img
                           src={activeVariant.image_url}
