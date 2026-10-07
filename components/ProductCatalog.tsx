@@ -196,8 +196,8 @@ export default function ProductCatalog({
                 key={groupKey}
                 className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col justify-between hover:shadow-md transition"
               >
-              {/* Produktbild mit Hover-Zoom Vorschau */}
-              <div className="h-48 bg-gray-100 flex items-center justify-center overflow-visible border-b border-gray-100 relative group z-10 hover:z-20">
+              {/* Produktbild mit großer Desktop-Hover-Vorschau */}
+              <div className="h-48 bg-gray-100 flex items-center justify-center border-b border-gray-100 relative rounded-t-lg">
                 {activeVariant.image_url ? (
                   <>
                     {/* Normales Kartenbild */}
@@ -207,12 +207,12 @@ export default function ProductCatalog({
                       className="w-full h-full object-contain p-4 cursor-pointer transition-transform duration-200 group-hover:scale-105"
                     />
 
-                    {/* Große Hover-Vorschau (Popout) */}
-                    <div className="hidden group-hover:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-white p-4 rounded-xl shadow-2xl border border-gray-200 z-50 pointer-events-none items-center justify-center transition-all animate-in fade-in zoom-in-95 duration-150">
+                    {/* Große Hover-Vorschau (Nur auf Desktop `md:`, klappt nach unten & zentriert auf) */}
+                    <div className="hidden md:group-hover:flex absolute top-2 left-1/2 -translate-x-1/2 w-[450px] h-[450px] bg-white p-6 rounded-2xl shadow-2xl border border-gray-300 z-50 pointer-events-none items-center justify-center transition-all animate-in fade-in zoom-in-95 duration-150">
                       <img
                         src={activeVariant.image_url}
                         alt={`${mainItem.title} preview`}
-                        className="max-w-full max-h-full object-contain"
+                        className="max-w-full max-h-full object-contain drop-shadow-md"
                       />
                     </div>
                   </>

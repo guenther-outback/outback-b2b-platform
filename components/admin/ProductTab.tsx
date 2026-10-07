@@ -304,8 +304,11 @@ export default function ProductTab({ products, groupedProducts, loadData }: Prod
             const isOpen = openGroupKey === groupKey
 
             return (
-              <div key={groupKey} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden transition hover:border-gray-300">
-                {/* Helles Header-Design per il Modello */}
+              <div
+                key={groupKey}
+                className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col justify-between hover:shadow-md transition relative group z-10 hover:z-30 overflow-visible"
+              >       
+                 {/* Helles Header-Design per il Modello */}
                 <button
                   onClick={() => toggleGroup(groupKey)}
                   className="w-full p-4 bg-white hover:bg-slate-50 text-gray-800 flex justify-between items-center text-left transition"
