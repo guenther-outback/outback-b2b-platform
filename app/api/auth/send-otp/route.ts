@@ -2,78 +2,106 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 
-export const dynamic = 'force-dynamic'
-
-// Supabase Service Role Client (braucht Administrationsrechte zum Code-Generieren)
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! // Wichtig: In .env.local eintragen!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
+// Mehrsprachige E-Mail-Vorlagen für den Sicherheitscode
+const emailTemplates: Record<string, { subject: string; title: string; text: string; footer: string }> = {
+  de: {
+    subject: 'Dein B2B Anmeldecode — Outback 97',
+    title: 'Anmeldung B2B Portal',
+    text: 'Nutze den folgenden 8-stelligen Sicherheitscode, um dich im Outback B2B-Portal anzumelden:',
+    footer: 'Dieser Code ist kurzzeitig gültig. Falls du keine Anmeldung angefordert hast, kannst du diese E-Mail ignorieren.',
+  },
+  it: {
+    subject: 'Il tuo codice di accesso B2B — Outback 97',
+    title: 'Accesso Portale B2B',
+    text: 'Utilizza il seguente codice di sicurezza a 8 cifre per accedere al portale B2B Outback:',
+    footer: 'Questo codice è valido per un periodo di tempo limitato. Se non hai richiesto l\'accesso, puoi ignorare questa e-mail.',
+  },
+  en: {
+    subject: 'Your B2B Login Code — Outback 97',
+    title: 'B2B Portal Sign-In',
+    text: 'Use the following 8-digit security code to sign in to the Outback B2B portal:',
+    footer: 'This code is valid for a limited time. If you did not request a sign-in code, you can safely ignore this email.',
+  },
+}
+
 export async function POST(request: Request) {
   try {
-    const { email } = await request.json()
-    const cleanEmail = email.trim().toLowerCase()
+    const { email, language = 'it' } = await request.json()
 
-    // 1. Prüfen, ob der Kunde in der Whitelist ist
-    const { data: customer, error: customerError } = await supabaseAdmin
-      .from('customers')
-      .select('company_name, contact_name, is_active')
-      .eq('email', cleanEmail)
-      .single()
-
-    if (customerError || !customer || !customer.is_active) {
-      return NextResponse.json(
-        { error: 'Diese E-Mail-Adresse ist nicht für das B2B-Portal freigeschaltet.' },
-        { status: 403 }
-      )
+    if (!email) {
+      return NextResponse.json({ error: 'E-Mail erforderlich' }, { status: 400 })
     }
 
-    // 2. OTP Code bei Supabase generieren
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.generateLink({
+    // 1. OTP-Code direkt von Supabase generieren lassen
+    const { data, error } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
-      email: cleanEmail,
+      email: email.trim().toLowerCase(),
     })
 
-    if (authError || !authData.properties?.email_otp) {
+    if (error || !data.properties?.email_otp) {
+      console.error('Supabase OTP Generation Error:', error)
       return NextResponse.json(
-        { error: 'Fehler beim Generieren des Sicherheitscodes.' },
+        { error: error?.message || 'Fehler beim Generieren des Codes' },
         { status: 500 }
       )
     }
 
-    const otpCode = authData.properties.email_otp
+    const otpCode = data.properties.email_otp
 
-    // 3. E-Mail direkt über Resend versenden
-    const emailResult = await resend.emails.send({
-      from: 'Outback B2B <info@b2b.outback.it>', // Nach Domain-Verifizierung z.B. auth@outback.it
-      to: [cleanEmail],
-      subject: `${otpCode} ist dein Outback B2B Login-Code`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; rounded: 8px;">
-          <h2 style="color: #1a365d; margin-bottom: 8px;">Outback B2B Portal</h2>
-          <p style="color: #4a5568; font-size: 16px;">Hallo ${customer.contact_name || customer.company_name},</p>
-          <p style="color: #4a5568; font-size: 14px;">dein Sicherheitscode für den Login im B2B-Portal lautet:</p>
-          
-          <div style="background-color: #f7fafc; border: 2px dashed #cbd5e0; padding: 15px; text-align: center; margin: 20px 0; border-radius: 6px;">
-            <span style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #2b6cb0;">${otpCode}</span>
-          </div>
+    // 2. Sprache auswählen (mit Fallback auf Italienisch)
+    const langKey = ['de', 'it', 'en'].includes(language) ? language : 'it'
+    const t = emailTemplates[langKey]
 
-          <p style="color: #718096; font-size: 12px;">Dieser Code ist 1 Stunde lang gültig. Falls du keinen Code angefordert hast, kannst du diese E-Mail einfach ignorieren.</p>
-          <hr style="border: none; border-top: 1px solid #e2e8f0; margin-top: 30px;" />
-          <p style="color: #a0aec0; font-size: 11px; text-align: center;">Outback Sports B2B Plattform</p>
+    // 3. HTML-Mail im Swiss-Brutalist Stil generieren
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; color: #111111; line-height: 1.5;">
+        <div style="border-bottom: 2px solid #111111; padding-bottom: 10px; margin-bottom: 20px;">
+          <h2 style="margin: 0; font-size: 18px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">
+            OUTBACK <span style="font-size: 12px; font-weight: normal; color: #666666;">97 B2B</span>
+          </h2>
         </div>
-      `,
-    })
 
-    if (emailResult.error) {
-      return NextResponse.json({ error: emailResult.error.message }, { status: 500 })
-    }
+        <h3 style="font-size: 16px; font-weight: 800; margin-bottom: 12px; text-transform: uppercase;">
+          ${t.title}
+        </h3>
+
+        <p style="font-size: 14px; color: #333333; margin-bottom: 24px;">
+          ${t.text}
+        </p>
+
+        <div style="background-color: #f4f4f5; border: 2px solid #111111; padding: 16px; text-align: center; margin-bottom: 24px;">
+          <span style="font-family: monospace; font-size: 28px; font-weight: bold; letter-spacing: 6px; color: #000000;">
+            ${otpCode}
+          </span>
+        </div>
+
+        <p style="font-size: 12px; color: #777777; border-top: 1px solid #e5e5e5; padding-top: 16px; margin-top: 30px;">
+          ${t.footer}
+        </p>
+      </div>
+    `
+
+    // 4. E-Mail über Resend absenden
+    await resend.emails.send({
+      from: 'Outback B2B <info@b2b.outback.it>',
+      to: [email.trim().toLowerCase()],
+      subject: t.subject,
+      html: emailHtml,
+    })
 
     return NextResponse.json({ success: true })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Serverfehler' }, { status: 500 })
+    console.error('Send OTP Error:', err)
+    return NextResponse.json(
+      { error: err.message || 'Fehler beim Senden der E-Mail' },
+      { status: 500 }
+    )
   }
 }

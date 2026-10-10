@@ -1,13 +1,21 @@
 {
   "login": {
-    "title": "Portale B2B Outback",
-    "sub_email": "Inserisci il tuo indirizzo email registrato",
-    "sub_code": "Inserisci il codice ricevuto via email",
-    "email_label": "Indirizzo Email",
-    "code_label": "Codice a 6 cifre",
-    "btn_request": "Richiedi codice",
-    "btn_verify": "Accedi",
-    "btn_change_email": "Usa un'altra email"
+"title": "ACCESSO PORTALE B2B",
+    "subtitle_email": "Inserisci il tuo indirizzo e-mail registrato",
+    "subtitle_code": "Inserisci il codice a 8 cifre ricevuto via e-mail",
+    "email_label": "Indirizzo E-mail",
+    "email_placeholder": "nome@azienda.com",
+    "code_label": "Codice di sicurezza a 8 cifre",
+    "send_code_btn": "Richiedi codice",
+    "checking_email_btn": "Verifica e-mail...",
+    "submit_btn": "Accedi",
+    "verifying_btn": "Verifica in corso...",
+    "use_different_email": "Usa un'altra e-mail",
+    "code_sent_msg": "Un codice a 8 cifre è stato inviato alla tua e-mail!",
+    "invalid_code_msg": "Codice non valido o scaduto: ",
+    "success_redirect": "Accesso effettuato! Reindirizzamento...",
+    "error_general": "Si è verificato un errore. Riprova più tardi.",
+    "request_access": "Richiedi accesso / Assistenza"
   },
   "shop": {
     "logged_in_as": "Connesso come",

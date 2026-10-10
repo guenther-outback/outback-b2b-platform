@@ -40,40 +40,35 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('outback_cart', JSON.stringify(cart))
   }, [cart])
 
-  const addToCart = (product: any, quantity: number) => {
-    // EK-Preis ermitteln (Fallback auf price_vk, falls price_ek nicht vorhanden oder 0 ist)
-    const ekPrice = Number(product.price_ek) > 0 
-      ? Number(product.price_ek) 
-      : Number(product.price_vk || 0)
+// In context/CartContext.tsx
+const addToCart = (product: any, quantity: number) => {
+  setCart((prevCart) => {
+    const existingIndex = prevCart.findIndex((item) => item.id === product.id)
 
-    const vkPrice = Number(product.price_vk) || 0
-
-    setCart((prevCart) => {
-      const existing = prevCart.find((item) => item.id === product.id)
-      if (existing) {
-        return prevCart.map((item) =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
-        )
-      }
+    if (existingIndex > -1) {
+      const updated = [...prevCart]
+      updated[existingIndex].quantity += quantity
+      return updated
+    } else {
       return [
         ...prevCart,
         {
           id: product.id,
-          title: product.title,
-          brand: product.brand,
           sku: product.sku,
+          brand: product.brand,
+          title: product.title,
+          color: product.color, // <-- WICHTIG: Prüfen, ob `color` hier übergeben wird!
           length: product.length,
-          price_ek: ekPrice, // <--- B2B-Einkaufspreis hinterlegt
-          price_vk: vkPrice,
-          stock_main: Number(product.stock_main) || 0,        // <--- HINZUGEFÜGT
-          stock_external: Number(product.stock_external) || 0,// <--- HINZUGEFÜGT
-          quantity,
+          price_ek: product.price_ek,
+          price_vk: product.price_vk,
+          stock_main: product.stock_main,
+          stock_external: product.stock_external,
+          quantity: quantity,
         },
       ]
-    })
-  }
+    }
+  })
+}
 
   const removeFromCart = (productId: string) => {
     setCart((prev) => prev.filter((item) => item.id !== productId))

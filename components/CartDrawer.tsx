@@ -182,70 +182,83 @@ export default function CartDrawer({
               {cart.length === 0 ? (
                 <p className="text-gray-600 font-medium text-center py-8">{t('shop.empty_cart')}</p>
               ) : (
-                cart.map((item) => {
-                  const itemEkPrice = item.price_ek || item.price_vk || 0
-                  const itemSubtotal = itemEkPrice * item.quantity
+cart.map((item) => {
+  const itemEkPrice = item.price_ek || item.price_vk || 0
+  const itemSubtotal = itemEkPrice * item.quantity
 
-                  const qty = Number(item.quantity) || 1
-                  const stockMain = Number(item.stock_main) || 0
-                  const mainQty = Math.min(stockMain, qty)
-                  const extQty = Math.max(0, qty - mainQty)
+  const qty = Number(item.quantity) || 1
+  const stockMain = Number(item.stock_main) || 0
+  const mainQty = Math.min(stockMain, qty)
+  const extQty = Math.max(0, qty - mainQty)
 
-                  return (
-                    <div key={item.id} className="flex justify-between items-center border-b pb-3 gap-2">
-                      <div>
-                        <div className="font-bold text-sm text-gray-900">
-                          {item.brand} {item.title}
-                        </div>
-                        <div className="text-xs text-gray-600 font-medium">
-                          SKU: {item.sku} {item.color && `| ${item.color}`} {item.length && `| ${item.length}`}
-                        </div>
+  const itemColor = item.color || item.color_name
+  const itemLength = item.length
 
-                        <div className="text-[11px] font-medium mt-0.5">
-                          {mainQty > 0 && extQty > 0 ? (
-                            <span className="text-blue-600 font-semibold">
-                              {t('shop.cart_stock_split_both')
-                                .replace('{main}', String(mainQty))
-                                .replace('{ext}', String(extQty))}
-                            </span>
-                          ) : mainQty > 0 ? (
-                            <span className="text-emerald-700 font-semibold">
-                              {t('shop.cart_stock_split_main').replace('{qty}', String(qty))}
-                            </span>
-                          ) : (
-                            <span className="text-amber-700 font-semibold">
-                              {t('shop.cart_stock_split_ext').replace('{qty}', String(qty))}
-                            </span>
-                          )}
-                        </div>
+  return (
+    <div key={item.id} className="flex justify-between items-start border-b pb-3 gap-3">
+      <div className="flex-1 min-w-0">
+        {/* Titel */}
+        <div className="font-bold text-sm text-gray-900 leading-snug">
+          {item.brand} {item.title}
+        </div>
 
-                        <div className="text-xs text-blue-600 font-bold mt-0.5">
-                          {itemEkPrice.toFixed(2)} €{' '}
-                          <span className="text-gray-600 font-normal">{t('shop.cart_unit_price')}</span>
-                          <span className="text-gray-700 font-bold ml-2">
-                            ({t('shop.cart_subtotal')} {itemSubtotal.toFixed(2)} €)
-                          </span>
-                        </div>
-                      </div>
+        {/* Nur Farbe und Länge (ohne SKU, ohne Icons, ohne Badge) */}
+        {(itemColor || itemLength) && (
+          <div className="text-xs text-gray-600 font-medium mt-0.5">
+            {itemColor && <span>{itemColor}</span>}
+            {itemColor && itemLength && <span> | </span>}
+            {itemLength && <span>{itemLength}</span>}
+          </div>
+        )}
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <QuantityInput
-                          value={item.quantity || 1}
-                          min={1}
-                          onChange={(newQty) => updateQuantity(item.id, newQty)}
-                        />
+        {/* Magazzino Status */}
+        <div className="text-[11px] font-medium mt-1">
+          {mainQty > 0 && extQty > 0 ? (
+            <span className="text-blue-600 font-semibold">
+              {t('shop.cart_stock_split_both')
+                .replace('{main}', String(mainQty))
+                .replace('{ext}', String(extQty))}
+            </span>
+          ) : mainQty > 0 ? (
+            <span className="text-emerald-700 font-semibold">
+              {t('shop.cart_stock_split_main').replace('{qty}', String(qty))}
+            </span>
+          ) : (
+            <span className="text-amber-700 font-semibold">
+              {t('shop.cart_stock_split_ext').replace('{qty}', String(qty))}
+            </span>
+          )}
+        </div>
 
-                        <button
-                          onClick={() => removeFromCart(item.id)}
-                          className="text-red-500 text-xs hover:underline p-1 font-bold"
-                          title={t('shop.cart_remove_item')}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })
+        {/* Preise */}
+        <div className="text-xs text-blue-600 font-bold mt-1">
+          {itemEkPrice.toFixed(2)} €{' '}
+          <span className="text-gray-500 font-normal">{t('shop.cart_unit_price')}</span>
+          <span className="text-gray-800 font-bold ml-2">
+            ({t('shop.cart_subtotal')} {itemSubtotal.toFixed(2)} €)
+          </span>
+        </div>
+      </div>
+
+      {/* Mengen-Eingabe & Entfernen-Button */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        <QuantityInput
+          value={item.quantity || 1}
+          min={1}
+          onChange={(newQty) => updateQuantity(item.id, newQty)}
+        />
+
+        <button
+          onClick={() => removeFromCart(item.id)}
+          className="text-red-500 text-xs hover:bg-red-50 p-1.5 rounded-full font-bold transition"
+          title={t('shop.cart_remove_item')}
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  )
+})
               )}
             </div>
 

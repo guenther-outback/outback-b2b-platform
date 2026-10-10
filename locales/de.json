@@ -1,13 +1,21 @@
 {
   "login": {
-    "title": "Outback B2B Portal",
-    "sub_email": "Gib deine registrierte E-Mail-Adresse ein",
-    "sub_code": "Gib den per E-Mail erhaltenen Code ein",
-    "email_label": "E-Mail Adresse",
-    "code_label": "6-stelliger Code",
-    "btn_request": "Code anfordern",
-    "btn_verify": "Anmelden",
-    "btn_change_email": "Andere E-Mail verwenden"
+"title": "B2B PORTAL ANMELDUNG",
+    "subtitle_email": "Geben Sie Ihre registrierte E-Mail-Adresse ein",
+    "subtitle_code": "Geben Sie den per E-Mail erhaltenen 8-stelligen Code ein",
+    "email_label": "E-Mail-Adresse",
+    "email_placeholder": "name@firma.com",
+    "code_label": "8-stelliger Sicherheitscode",
+    "send_code_btn": "Code anfordern",
+    "checking_email_btn": "Prüfe E-Mail...",
+    "submit_btn": "Anmelden",
+    "verifying_btn": "Verifiziere...",
+    "use_different_email": "Andere E-Mail verwenden",
+    "code_sent_msg": "Ein 8-stelliger Code wurde an Ihre E-Mail gesendet!",
+    "invalid_code_msg": "Ungültiger oder abgelaufener Code: ",
+    "success_redirect": "Erfolgreich angemeldet! Leite weiter...",
+    "error_general": "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
+    "request_access": "Zugang anfordern / Hilfe"
   },
   "shop": {
     "logged_in_as": "Angemeldet als",
