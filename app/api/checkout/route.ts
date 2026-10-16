@@ -78,6 +78,7 @@ export async function POST(request: Request) {
         customer_id: customer?.id || null,
         user_email: userEmail,
         placed_by_agent_email: agentCustomerNote ? userEmail : null,
+        agent_customer_note: agentCustomerNote || null, // Speichert den Kundennamen in eigener Spalte
         total_amount: finalTotalAmount,
         shipping_cost: finalShippingCost,
         items: items,

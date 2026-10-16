@@ -94,6 +94,9 @@ export default function OrderHistoryTab() {
                     {order.placed_by_agent_email && (
                       <div className="text-[11px] text-amber-800 font-medium">
                         💼 {t('shop.order_placed_by_agent')}: <span className="font-bold">{order.placed_by_agent_email}</span>
+                        {order.agent_customer_note && (
+                          <span> (für: <span className="font-bold">{order.agent_customer_note}</span>)</span>
+                        )}
                       </div>
                     )}
                     <div className="text-gray-500 text-[11px]">
