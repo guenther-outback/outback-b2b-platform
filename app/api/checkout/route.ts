@@ -11,7 +11,15 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request: Request) {
   try {
-    const { items, shippingCost = 0, totalAmount, userEmail, note } = await request.json()
+    const { 
+      items, 
+      shippingCost = 0, 
+      totalAmount, 
+      userEmail, 
+      note, 
+      agentCustomerNote, 
+      deliveryDate 
+    } = await request.json()
 
     if (!items || items.length === 0 || !userEmail) {
       return NextResponse.json({ error: 'Dati ordine non validi' }, { status: 400 })
@@ -35,7 +43,7 @@ export async function POST(request: Request) {
       )
     }
 
-    // 2. Caricamento dati cliente da Supabase
+    // 2. Caricamento dati cliente / utente da Supabase
     const { data: customer } = await supabaseAdmin
       .from('customers')
       .select('*')
@@ -58,16 +66,23 @@ export async function POST(request: Request) {
     const finalShippingCost = Number(shippingCost) || 0
     const finalTotalAmount = Number(totalAmount) || (subtotal + finalShippingCost)
 
-    // 3. Salvataggio dell'ordine nella tabella 'orders' (inclusa la nota e le spese di spedizione)
+    // Kombinierte Notiz erstellen (falls Agenten-Bestellung vorliegt)
+    const finalNote = agentCustomerNote 
+      ? `[ORDINE AGENTE per Cliente: ${agentCustomerNote}] ${note || ''}`.trim()
+      : note || ''
+
+    // 3. Salvataggio dell'ordine nella tabella 'orders'
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
       .insert({
         customer_id: customer?.id || null,
         user_email: userEmail,
+        placed_by_agent_email: agentCustomerNote ? userEmail : null,
         total_amount: finalTotalAmount,
         shipping_cost: finalShippingCost,
         items: items,
-        note: note || '',
+        note: finalNote,
+        delivery_date: deliveryDate || null,
         status: 'pending'
       })
       .select()
@@ -88,13 +103,12 @@ export async function POST(request: Request) {
       await supabaseAdmin.from('order_items').insert(orderItems)
     }
 
-    // 4. Generazione della tabella HTML per l'email in italiano (con ripartizione dei magazzini)
+    // 4. Generazione della tabella HTML per l'email
     const itemsHtml = items.map((item: any) => {
       const itemEkPrice = Number(item.price_ek) || Number(item.price_vk) || 0
       const qty = Number(item.quantity) || 1
       const stockMain = Number(item.stock_main) || 0
 
-      // Calcolo esatto della ripartizione tra magazzino principale ed esterno
       const mainQty = Math.min(stockMain, qty)
       const extQty = Math.max(0, qty - mainQty)
 
@@ -111,6 +125,8 @@ export async function POST(request: Request) {
         warehouseColor = '#2563eb' // Blu per magazzino misto
       }
 
+      const itemTotal = itemEkPrice * qty
+
       return `
         <tr>
           <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-family: monospace;">${item.sku}</td>
@@ -122,7 +138,7 @@ export async function POST(request: Request) {
           </td>
           <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: center;">${qty}</td>
           <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">${itemEkPrice.toFixed(2)} €</td>
-          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">${(itemEkPrice * qty).toFixed(2)} €</td>
+          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">${itemTotal.toFixed(2)} €</td>
         </tr>
       `
     }).join('')
@@ -131,12 +147,29 @@ export async function POST(request: Request) {
       <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; color: #2d3748; line-height: 1.5;">
         <h2 style="color: #1a365d; border-bottom: 2px solid #1a365d; padding-bottom: 8px;">Nuovo Ordine B2B Ricevuto</h2>
         
-        <h3 style="color: #2b6cb0; margin-top: 20px;">Informazioni Cliente:</h3>
+        ${agentCustomerNote ? `
+          <div style="background: #fef3c7; padding: 12px; border-radius: 6px; border: 1px solid #f59e0b; margin-bottom: 16px; color: #92400e; font-size: 14px;">
+            <strong>💼 Ordine inserito da Agente:</strong> ${userEmail}<br/>
+            <strong>Cliente Finale indicato:</strong> ${agentCustomerNote}
+          </div>
+        ` : ''}
+
+        <h3 style="color: #2b6cb0; margin-top: 20px;">Informazioni Utente / Account:</h3>
         <p style="background: #f7fafc; padding: 14px; border-radius: 6px; border: 1px solid #e2e8f0;">
           ${customerInfo}
         </p>
 
-        ${note ? `<p style="background: #fffaf0; padding: 12px; border-radius: 6px; border: 1px solid #feebc8;"><strong>Nota del cliente:</strong><br/>${note}</p>` : ''}
+        ${deliveryDate ? `
+          <p style="background: #ebf8ff; padding: 12px; border-radius: 6px; border: 1px solid #bee3f8; color: #2b6cb0;">
+            <strong>📅 Data di consegna desiderata:</strong> ${deliveryDate}
+          </p>
+        ` : ''}
+
+        ${finalNote ? `
+          <p style="background: #fffaf0; padding: 12px; border-radius: 6px; border: 1px solid #feebc8;">
+            <strong>Note dell'ordine:</strong><br/>${finalNote}
+          </p>
+        ` : ''}
 
         <h3 style="color: #2b6cb0; margin-top: 25px;">Articoli Ordinati:</h3>
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px;">
@@ -180,12 +213,12 @@ export async function POST(request: Request) {
       </div>
     `
 
-    // 5. Invio e-mail tramite Resend utilizzando il dominio verificato
+    // 5. Invio e-mail tramite Resend
     await resend.emails.send({
       from: 'Outback B2B <info@b2b.outback.it>',
       to: ['info@outback.it'],
       replyTo: userEmail,
-      subject: `[Ordine B2B] ${customer?.company_name || userEmail}`,
+      subject: `[Ordine B2B] ${agentCustomerNote ? `[Agente] ${agentCustomerNote}` : (customer?.company_name || userEmail)}`,
       html: emailHtml,
     })
 

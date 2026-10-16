@@ -70,6 +70,24 @@
     "shipping_missing_for_free": "Fehlen {amount} € für versandkostenfrei",
     "shipping_main_warehouse": "Hauptlager",
     "min_order_akta": "Akta: Mindestbestellmenge 20 Stk. (Aktuell: {qty} Stk.)",
-    "min_order_suno": "Suno: Mindestbestellmenge 6 Stk. (Aktuell: {qty} Stk.)"
+    "min_order_suno": "Suno: Mindestbestellmenge 6 Stk. (Aktuell: {qty} Stk.)",
+    "agent_customer_label": "Bestellung für welchen Kunden? *",
+    "agent_customer_placeholder": "z.B. Sport Athlete GmbH / info@athlete.com",
+    "delivery_date_label": "Gewünschtes Lieferdatum:",
+    "roles": {
+      "customer": "Kunde",
+      "agent": "Agent / Vertreter",
+      "admin": "Administrator"
+    },
+    "agent_customer_new_option": "Neuer / Nicht registrierter Kunde...",
+    "orders_history_title": "Bestellhistorie",
+    "order_number": "Bestellung",
+    "order_customer": "Kunde",
+    "order_placed_by_agent": "Platziert von Agent",
+    "order_note": "Hinweis",
+    "order_delivery_date": "Lieferdatum",
+    "order_items_title": "Bestellte Artikel",
+    "order_loading": "Lade Bestellungen...",
+    "order_empty": "Keine Bestellungen vorhanden."
   }
 }

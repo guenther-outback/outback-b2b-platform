@@ -70,6 +70,24 @@
     "shipping_missing_for_free": "{amount} € remaining for free shipping",
     "shipping_main_warehouse": "Main Warehouse",
     "min_order_akta": "Akta: minimum order 20 pcs (currently: {qty} pcs).",
-    "min_order_suno": "Suno: minimum order 6 pcs (currently: {qty} pcs)."
+    "min_order_suno": "Suno: minimum order 6 pcs (currently: {qty} pcs).",
+    "agent_customer_label": "Order for which customer? *",
+    "agent_customer_placeholder": "e.g. Sport Athlete Ltd / info@athlete.com",
+    "delivery_date_label": "Requested delivery date:",
+    "roles": {
+      "customer": "Customer",
+      "agent": "Agent / Sales Rep",
+      "admin": "Administrator"
+    },
+    "agent_customer_new_option": "New / Unregistered customer...",
+    "orders_history_title": "Order History",
+    "order_number": "Order",
+    "order_customer": "Customer",
+    "order_placed_by_agent": "Placed by Agent",
+    "order_note": "Note",
+    "order_delivery_date": "Delivery date",
+    "order_items_title": "Ordered items",
+    "order_loading": "Loading orders...",
+    "order_empty": "No orders found."
   }
 }

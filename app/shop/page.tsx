@@ -11,13 +11,16 @@ import CartDrawer from '@/components/CartDrawer'
 
 export default function ShopPage() {
   const [products, setProducts] = useState<any[]>([])
+  const [customersList, setCustomersList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [userEmail, setUserEmail] = useState('')
   const [orderSubmitting, setOrderSubmitting] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isAgent, setIsAgent] = useState(false)
   const [orderSuccess, setOrderSuccess] = useState(false)
   const [orderNote, setOrderNote] = useState('')
+  const [agentCustomerNote, setAgentCustomerNote] = useState('')
 
   const [allowedBrands, setAllowedBrands] = useState<string[] | null>(null)
   const [activeTab, setActiveTab] = useState<'catalog' | 'orders'>('catalog')
@@ -33,16 +36,49 @@ export default function ShopPage() {
 
       const { data: customer } = await supabase
         .from('customers')
-        .select('is_admin, allowed_brands')
+        .select('role, allowed_brands')
         .eq('email', user.email.trim().toLowerCase())
         .single()
 
       if (customer) {
-        if (customer.is_admin) setIsAdmin(true)
-        if (customer.allowed_brands && customer.allowed_brands.length > 0) {
+        const userRole = customer.role || 'customer'
+        const adminState = userRole === 'admin'
+        const agentState = userRole === 'agent'
+
+        setIsAdmin(adminState)
+        setIsAgent(agentState)
+
+      
+        if (adminState || agentState) {
+          let query = supabase
+            .from('customers')
+            .select('id, company_name, contact_name, email, city, role, agent_email, is_admin')
+            .order('company_name', { ascending: true })
+
+          const { data: allCustomers } = await query
+
+          if (allCustomers) {
+            const filteredForUser = allCustomers.filter((c: any) => {
+              const isCustomerRole = c.role === 'customer' || (!c.role && !c.is_admin)
+              if (!isCustomerRole) return false
+
+              // Wenn der User Admin ist -> sieht alle Kunden
+              if (adminState) return true
+
+              // Wenn der User Agent ist -> sieht nur ihm zugewiesene Kunden
+              return c.agent_email?.trim().toLowerCase() === user.email.trim().toLowerCase()
+            })
+
+            setCustomersList(filteredForUser)
+          }
+        }
+
+        if (adminState) {
+          setAllowedBrands(null)
+        } else if (customer.allowed_brands && customer.allowed_brands.length > 0) {
           setAllowedBrands(customer.allowed_brands)
         } else {
-          setAllowedBrands(null)
+          setAllowedBrands([])
         }
       }
     }
@@ -62,7 +98,7 @@ export default function ShopPage() {
     fetchProducts()
   }, [])
 
-  const handleCheckout = async (shippingCost: number, grandTotal: number) => {
+  const handleCheckout = async (shippingCost: number, grandTotal: number, deliveryDate: string) => {
     if (cart.length === 0 || orderSubmitting) return
 
     setOrderSubmitting(true)
@@ -77,6 +113,8 @@ export default function ShopPage() {
           totalAmount: grandTotal,
           userEmail,
           note: orderNote,
+          agentCustomerNote: (isAdmin || isAgent) ? agentCustomerNote : null,
+          deliveryDate: deliveryDate || null,
         }),
       })
 
@@ -88,6 +126,7 @@ export default function ShopPage() {
 
       clearCart()
       setOrderNote('')
+      setAgentCustomerNote('')
       setOrderSuccess(true)
 
       await fetchProducts()
@@ -108,17 +147,15 @@ export default function ShopPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* KOMBILIERTER STICKY HEADER FÜR MOBIL & DESKTOP */}
+      {/* STICKY HEADER */}
       <header className="bg-slate-900/95 backdrop-blur-md text-slate-100 sticky top-0 z-50 border-b border-slate-800 shadow-md">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-2">
-          {/* Logo */}
           <div className="flex items-center gap-2 shrink-0">
             <a href="/shop" className="text-sm sm:text-lg font-bold tracking-tight text-white hover:opacity-90">
               OUTBACK <span className="text-[10px] sm:text-xs font-normal text-slate-300 uppercase tracking-widest ml-0.5">B2B</span>
             </a>
           </div>
 
-          {/* Rechte Steuerungs-Buttons (Kompakt auf Mobile) */}
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <div className="scale-90 sm:scale-100 origin-right">
               <LanguageSwitcher />
@@ -135,7 +172,6 @@ export default function ShopPage() {
               </a>
             )}
 
-            {/* Warenkorb Button */}
             <button
               onClick={() => setIsCartOpen(true)}
               className="relative text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm"
@@ -151,7 +187,6 @@ export default function ShopPage() {
               )}
             </button>
 
-            {/* Logout Button */}
             <button 
               onClick={handleLogout} 
               className="text-xs text-slate-300 hover:text-white p-1"
@@ -165,7 +200,6 @@ export default function ShopPage() {
           </div>
         </div>
 
-        {/* TAB-NAVIGATION DIREKT IN DEN HEADER INTEGRIERT (VERHINDERT DOPPELTEN STICKY-ABSTAND) */}
         <div className="bg-slate-900 border-t border-slate-800/80 px-3 sm:px-6">
           <div className="max-w-7xl mx-auto flex gap-2 sm:gap-6 overflow-x-auto text-xs sm:text-sm">
             <button
@@ -193,7 +227,6 @@ export default function ShopPage() {
         </div>
       </header>
 
-      {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8 flex-1 w-full">
         {activeTab === 'catalog' && (
           <ProductCatalog
@@ -209,7 +242,6 @@ export default function ShopPage() {
         {activeTab === 'orders' && <OrderHistoryTab />}
       </main>
 
-      {/* Ausgelagertes Cart Drawer Modul */}
       <CartDrawer
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
@@ -222,6 +254,10 @@ export default function ShopPage() {
         orderSubmitting={orderSubmitting}
         orderSuccess={orderSuccess}
         setOrderSuccess={setOrderSuccess}
+        isAgent={isAdmin || isAgent}
+        agentCustomerNote={agentCustomerNote}
+        setAgentCustomerNote={setAgentCustomerNote}
+        customersList={customersList}
         t={t}
       />
     </div>

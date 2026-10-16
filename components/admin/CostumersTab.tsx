@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabaseClient'
+import { useLanguage } from '@/context/LanguageContext'
 
 interface CustomersTabProps {
   customers: any[]
@@ -9,10 +10,14 @@ interface CustomersTabProps {
   loadData: () => void
 }
 
+type UserRole = 'customer' | 'agent' | 'admin'
+
 export default function CustomersTab({ customers, availableBrands, loadData }: CustomersTabProps) {
   const [editingCustomerId, setEditingEditingCustomerId] = useState<string | null>(null)
   const [customerSearch, setCustomerSearch] = useState('')
   
+  const { t } = useLanguage()
+
   const [newCustomer, setNewCustomer] = useState({
     company_name: '', 
     contact_name: '', 
@@ -20,13 +25,16 @@ export default function CustomersTab({ customers, availableBrands, loadData }: C
     address: '', 
     zip_code: '', 
     city: '',
-    is_admin: false,
+    role: 'customer' as UserRole,
+    agent_email: '',
     allowed_brands: [] as string[]
   })
 
   const supabase = createClient()
 
-  // Filterlogik für die Kundensuche
+  // Liste aller registrierten Agenten für das Dropdown im Admin-Formular
+  const availableAgents = customers.filter(c => c.role === 'agent')
+
   const filteredCustomers = customers.filter(c => {
     const query = customerSearch.toLowerCase().trim()
     if (!query) return true
@@ -52,13 +60,16 @@ export default function CustomersTab({ customers, availableBrands, loadData }: C
   const handleCreateOrUpdateCustomer = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    const payload = {
+      ...newCustomer,
+      email: newCustomer.email.trim().toLowerCase(),
+      agent_email: newCustomer.role === 'customer' && newCustomer.agent_email ? newCustomer.agent_email.trim().toLowerCase() : null
+    }
+
     if (editingCustomerId) {
       const { error } = await supabase
         .from('customers')
-        .update({
-          ...newCustomer,
-          email: newCustomer.email.trim().toLowerCase(),
-        })
+        .update(payload)
         .eq('id', editingCustomerId)
 
       if (!error) {
@@ -70,8 +81,7 @@ export default function CustomersTab({ customers, availableBrands, loadData }: C
       }
     } else {
       const { error } = await supabase.from('customers').insert([{
-        ...newCustomer,
-        email: newCustomer.email.trim().toLowerCase(),
+        ...payload,
         is_active: true
       }])
 
@@ -94,33 +104,44 @@ export default function CustomersTab({ customers, availableBrands, loadData }: C
       address: c.address || '',
       zip_code: c.zip_code || '',
       city: c.city || '',
-      is_admin: !!c.is_admin,
+      role: (c.role as UserRole) || 'customer',
+      agent_email: c.agent_email || '',
       allowed_brands: c.allowed_brands || []
     })
   }
 
   const resetForm = () => {
     setEditingEditingCustomerId(null)
-    setNewCustomer({ company_name: '', contact_name: '', email: '', address: '', zip_code: '', city: '', is_admin: false, allowed_brands: [] })
+    setNewCustomer({ 
+      company_name: '', 
+      contact_name: '', 
+      email: '', 
+      address: '', 
+      zip_code: '', 
+      city: '', 
+      role: 'customer', 
+      agent_email: '',
+      allowed_brands: [] 
+    })
   }
 
-  const handleToggleAdmin = async (customer: any) => {
-    const newStatus = !customer.is_admin
+  const handleRoleChange = async (customer: any, newRole: UserRole) => {
     const { error } = await supabase
       .from('customers')
-      .update({ is_admin: newStatus })
+      .update({ role: newRole })
       .eq('id', customer.id)
 
     if (!error) loadData()
+    else alert('Errore cambio ruolo: ' + error.message)
   }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      {/* Formular per Creazione / Modifica */}
+      {/* Formular */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 lg:sticky lg:top-24 lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-bold text-lg text-gray-800">
-            {editingCustomerId ? 'Modifica Cliente' : 'Abilita Cliente B2B'}
+            {editingCustomerId ? 'Modifica Utente' : 'Abilita Nuovo Utente'}
           </h2>
           {editingCustomerId && (
             <button onClick={resetForm} className="text-xs text-red-500 underline font-semibold">
@@ -157,62 +178,80 @@ export default function CustomersTab({ customers, availableBrands, loadData }: C
             </div>
           </div>
 
+          {/* RUOLO SELECTION */}
+          <div className="pt-2 border-t border-gray-200">
+            <label className="block text-xs font-bold text-gray-800 mb-1">Ruolo Utente</label>
+            <select
+              value={newCustomer.role}
+              onChange={e => setNewCustomer({ ...newCustomer, role: e.target.value as UserRole })}
+              className="w-full p-2 border border-gray-300 rounded text-xs font-bold text-gray-800 bg-white"
+            >
+              <option value="customer">👤 {t('shop.roles.customer')}</option>
+              <option value="agent">💼 {t('shop.roles.agent')}</option>
+              <option value="admin">👑 {t('shop.roles.admin')}</option>
+            </select>
+          </div>
+
+          {/* AGENTEN-ZUORDNUNG (NUR SICHTBAR WENN RUOLO = CUSTOMER) */}
+          {newCustomer.role === 'customer' && (
+            <div>
+              <label className="block text-xs font-bold text-gray-800 mb-1">
+                💼 Agente Assegnato (Opzionale)
+              </label>
+              <select
+                value={newCustomer.agent_email}
+                onChange={e => setNewCustomer({ ...newCustomer, agent_email: e.target.value })}
+                className="w-full p-2 border border-gray-300 rounded text-xs text-gray-800 bg-white"
+              >
+                <option value="">-- Nessun agente assegnato --</option>
+                {availableAgents.map(ag => (
+                  <option key={ag.id} value={ag.email}>
+                    {ag.company_name || ag.contact_name} ({ag.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* MARKEN-ZUTEILUNG */}
           <div className="pt-2 border-t border-gray-200">
             <label className="block text-xs font-bold text-gray-800 mb-1.5">
-              Marchi Abilitati (Vuoto = Tutti):
+              Marchi Autorizzati (Vuoto = Tutti):
             </label>
             <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 bg-gray-50 rounded border border-gray-200">
-              {availableBrands.length === 0 ? (
-                <span className="text-xs text-gray-500">Nessun marchio trovato nel catalogo.</span>
-              ) : (
-                availableBrands.map(brand => {
-                  const isSelected = newCustomer.allowed_brands.includes(brand)
-                  return (
-                    <button
-                      key={brand}
-                      type="button"
-                      onClick={() => handleBrandToggle(brand)}
-                      className={`text-xs px-2.5 py-1 rounded-md font-semibold transition border ${
-                        isSelected 
-                          ? 'bg-blue-600 text-white border-blue-600' 
-                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
-                      }`}
-                    >
-                      {isSelected ? '✓ ' : '+ '}{brand}
-                    </button>
-                  )
-                })
-              )}
+              {availableBrands.map(brand => {
+                const isSelected = newCustomer.allowed_brands.includes(brand)
+                return (
+                  <button
+                    key={brand}
+                    type="button"
+                    onClick={() => handleBrandToggle(brand)}
+                    className={`text-xs px-2.5 py-1 rounded-md font-semibold transition border ${
+                      isSelected 
+                        ? 'bg-blue-600 text-white border-blue-600' 
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+                    }`}
+                  >
+                    {isSelected ? '✓ ' : '+ '}{brand}
+                  </button>
+                )
+              })}
             </div>
           </div>
 
-          <div className="pt-2">
-            <label className="inline-flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={newCustomer.is_admin}
-                onChange={e => setNewCustomer({...newCustomer, is_admin: e.target.checked})}
-                className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
-              />
-              <span className="text-xs font-bold text-gray-800">Utente Admin</span>
-            </label>
-          </div>
-
           <button type="submit" className={`w-full text-white font-bold py-2 rounded text-sm mt-4 ${editingCustomerId ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'}`}>
-            {editingCustomerId ? 'Salva Modifiche' : 'Registra e Abilita Cliente'}
+            {editingCustomerId ? 'Salva Modifiche' : 'Registra e Abilita Utente'}
           </button>
         </form>
       </div>
 
-      {/* Tabella Clienti B2B mit Suchleiste */}
+      {/* Tabelle */}
       <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
           <h2 className="font-bold text-lg text-gray-800 shrink-0">
-            Clienti B2B Abilitati ({filteredCustomers.length})
+            Utenti e Clienti B2B ({filteredCustomers.length})
           </h2>
 
-          {/* SUCHLEISTE FÜR KUNDEN */}
           <div className="relative w-full sm:w-64">
             <input
               type="text"
@@ -222,70 +261,58 @@ export default function CustomersTab({ customers, availableBrands, loadData }: C
               className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-md text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
             <span className="absolute left-2.5 top-1.5 text-gray-400 text-xs">🔍</span>
-            {customerSearch && (
-              <button
-                onClick={() => setCustomerSearch('')}
-                className="absolute right-2.5 top-1.5 text-gray-400 hover:text-gray-700 text-xs font-bold"
-              >
-                ✕
-              </button>
-            )}
           </div>
         </div>
 
         <table className="w-full text-left text-xs">
           <thead>
             <tr className="bg-gray-100 border-b border-gray-200 text-gray-800 font-bold">
-              <th className="p-2">Azienda</th>
+              <th className="p-2">Azienda / Referente</th>
               <th className="p-2">E-mail</th>
-              <th className="p-2">Marchi Autorizzati</th>
+              <th className="p-2">Agente</th>
               <th className="p-2">Ruolo</th>
               <th className="p-2 text-right">Azione</th>
             </tr>
           </thead>
           <tbody>
-            {filteredCustomers.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="p-4 text-center text-gray-500">
-                  Nessun cliente trovato per "{customerSearch}".
+            {filteredCustomers.map(c => (
+              <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50">
+                <td className="p-2 font-bold text-gray-900">
+                  {c.company_name}
+                  <div className="text-[10px] font-normal text-gray-600">{c.contact_name} ({c.city})</div>
+                </td>
+                <td className="p-2 font-mono text-gray-700">{c.email}</td>
+                <td className="p-2 text-gray-600">
+                  {c.agent_email ? (
+                    <span className="bg-amber-50 text-amber-900 border border-amber-200 text-[10px] px-1.5 py-0.5 rounded font-medium">
+                      💼 {c.agent_email}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400 text-[10px]">-</span>
+                  )}
+                </td>
+                <td className="p-2">
+                  <select
+                    value={c.role || 'customer'}
+                    onChange={(e) => handleRoleChange(c, e.target.value as UserRole)}
+                    className={`text-[11px] font-bold px-1.5 py-0.5 rounded border focus:outline-none cursor-pointer ${
+                      c.role === 'admin'
+                        ? 'bg-purple-100 text-purple-900 border-purple-300'
+                        : c.role === 'agent'
+                        ? 'bg-amber-100 text-amber-900 border-amber-300'
+                        : 'bg-gray-100 text-gray-800 border-gray-300'
+                    }`}
+                  >
+                    <option value="customer">👤 {t('shop.roles.customer')}</option>
+                    <option value="agent">💼 {t('shop.roles.agent')}</option>
+                    <option value="admin">👑 {t('shop.roles.admin')}</option>
+                  </select>
+                </td>
+                <td className="p-2 text-right">
+                  <button onClick={() => handleEditClick(c)} className="p-1 text-slate-600 hover:text-blue-600 text-sm font-bold" title="Modifica cliente">✏️</button>
                 </td>
               </tr>
-            ) : (
-              filteredCustomers.map(c => (
-                <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="p-2 font-bold text-gray-900">
-                    {c.company_name}
-                    <div className="text-[10px] font-normal text-gray-600">{c.contact_name} ({c.city})</div>
-                  </td>
-                  <td className="p-2 font-mono text-gray-700">{c.email}</td>
-                  <td className="p-2">
-                    {!c.allowed_brands || c.allowed_brands.length === 0 ? (
-                      <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded font-bold">Tutti</span>
-                    ) : (
-                      <div className="flex flex-wrap gap-1">
-                        {c.allowed_brands.map((b: string) => (
-                          <span key={b} className="bg-blue-50 text-blue-800 border border-blue-200 text-[10px] px-1.5 py-0.5 rounded font-medium">
-                            {b}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </td>
-                  <td className="p-2">
-                    <button onClick={() => handleToggleAdmin(c)} title="Clicca per cambiare">
-                      {c.is_admin ? (
-                        <span className="bg-purple-100 text-purple-800 text-[10px] px-2 py-0.5 rounded font-bold">👑 Admin</span>
-                      ) : (
-                        <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded font-bold">👤 Cliente</span>
-                      )}
-                    </button>
-                  </td>
-                  <td className="p-2 text-right">
-                    <button onClick={() => handleEditClick(c)} className="p-1 text-slate-600 hover:text-blue-600 text-sm font-bold" title="Modifica cliente">✏️</button>
-                  </td>
-                </tr>
-              ))
-            )}
+            ))}
           </tbody>
         </table>
       </div>

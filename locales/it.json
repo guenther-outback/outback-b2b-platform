@@ -70,6 +70,24 @@
     "shipping_missing_for_free": "Mancano {amount} € per Porto Franco",
     "shipping_main_warehouse": "Magazzino Principale",
     "min_order_akta": "Akta: ordine minimo 20 pz (attualmente: {qty} pz).",
-    "min_order_suno": "Suno: ordine minimo 6 pz (attualmente: {qty} pz)."
+    "min_order_suno": "Suno: ordine minimo 6 pz (attualmente: {qty} pz).",
+    "agent_customer_label": "Ordine per quale cliente? *",
+    "agent_customer_placeholder": "es. Sport Athlete srl / info@athlete.com",
+    "delivery_date_label": "Data di consegna desiderata:",
+    "roles": {
+      "customer": "Cliente B2B",
+      "agent": "Agente / Rappresentante",
+      "admin": "Amministratore"
+    },
+    "agent_customer_new_option": "Nuovo cliente / Non registrato...",
+    "orders_history_title": "Cronologia ordini",
+    "order_number": "Ordine",
+    "order_customer": "Cliente",
+    "order_placed_by_agent": "Inserito da Agente",
+    "order_note": "Nota",
+    "order_delivery_date": "Data consegna",
+    "order_items_title": "Articoli ordinati",
+    "order_loading": "Caricamento ordini in corso...",
+    "order_empty": "Nessun ordine trovato."
   }
 }

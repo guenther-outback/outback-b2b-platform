@@ -43,22 +43,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Regel 2: Schutz für den Admin-Bereich (/admin)
+  // Regel 2: Schutz für den Admin-Bereich (/admin) - Nur Admins zulassen
   if (user && pathname.startsWith('/admin')) {
     const { data: customer } = await supabase
       .from('customers')
-      .select('is_admin')
+      .select('role')
       .eq('email', user.email?.trim().toLowerCase())
       .single()
 
-    // Falls der Kunde nicht existiert oder is_admin nicht true ist -> Umleitung zum Shop
-    if (!customer || !customer.is_admin) {
+    // Falls der Kunde nicht existiert oder role nicht 'admin' ist -> Umleitung zum Shop
+    if (!customer || customer.role !== 'admin') {
       return NextResponse.redirect(new URL('/shop', request.url))
     }
   }
 
   // Regel 3: Bereits eingeloggt & besucht '/login' -> Umleitung zum Shop
-  // (Hauptseite '/' bleibt auch für Eingeloggte erreichbar, um andere B2B-Links zu wählen)
   if (user && pathname === '/login') {
     return NextResponse.redirect(new URL('/shop', request.url))
   }
