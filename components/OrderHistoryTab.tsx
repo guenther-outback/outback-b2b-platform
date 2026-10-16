@@ -80,6 +80,12 @@ export default function OrderHistoryTab() {
             const isExpanded = expandedOrderId === order.id
             const orderDate = new Date(order.created_at).toLocaleDateString()
 
+            // 1. Endkunde
+            const displayCustomer = order.agent_customer_note || order.user_email
+
+            // 2. Erfasser / Agent (Fallbacks für ältere Bestellungen ohne placed_by_agent_email)
+            const agentEmail = order.placed_by_agent_email || (order.agent_customer_note ? order.user_email : null)
+
             return (
               <div key={order.id} className="border border-gray-200 rounded-lg overflow-hidden">
                 <div 
@@ -91,17 +97,17 @@ export default function OrderHistoryTab() {
                       {t('shop.order_number')} #{order.id.slice(0, 8)} • <span className="text-gray-600">{orderDate}</span>
                     </div>
 
-                    {order.placed_by_agent_email && (
+                    {/* Kunde */}
+                    <div className="text-gray-600 text-[11px]">
+                      {t('shop.order_customer')}: <span className="font-bold text-gray-900">{displayCustomer}</span>
+                    </div>
+
+                    {/* Agent / Admin Erfasser */}
+                    {agentEmail && (
                       <div className="text-[11px] text-amber-800 font-medium">
-                        💼 {t('shop.order_placed_by_agent')}: <span className="font-bold">{order.placed_by_agent_email}</span>
-                        {order.agent_customer_note && (
-                          <span> (für: <span className="font-bold">{order.agent_customer_note}</span>)</span>
-                        )}
+                        💼 {t('shop.order_placed_by')}: <span className="font-bold">{agentEmail}</span>
                       </div>
                     )}
-                    <div className="text-gray-500 text-[11px]">
-                      {t('shop.order_customer')}: <span className="font-semibold text-gray-700">{order.user_email}</span>
-                    </div>
                   </div>
 
                   <div className="flex items-center gap-3 self-end sm:self-auto">
@@ -119,6 +125,7 @@ export default function OrderHistoryTab() {
                   </div>
                 </div>
 
+                {/* Details bei Klick */}
                 {isExpanded && (
                   <div className="p-4 bg-white border-t border-gray-100 text-xs space-y-3">
                     {order.note && (

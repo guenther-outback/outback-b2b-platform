@@ -88,6 +88,7 @@
     "order_delivery_date": "Delivery date",
     "order_items_title": "Ordered items",
     "order_loading": "Loading orders...",
-    "order_empty": "No orders found."
+    "order_empty": "No orders found.",
+    "order_placed_by": "Placed by"
   }
 }

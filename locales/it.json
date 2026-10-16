@@ -88,6 +88,7 @@
     "order_delivery_date": "Data consegna",
     "order_items_title": "Articoli ordinati",
     "order_loading": "Caricamento ordini in corso...",
-    "order_empty": "Nessun ordine trovato."
+    "order_empty": "Nessun ordine trovato.",
+    "order_placed_by": "Ordinato da"
   }
 }

@@ -88,6 +88,7 @@
     "order_delivery_date": "Lieferdatum",
     "order_items_title": "Bestellte Artikel",
     "order_loading": "Lade Bestellungen...",
-    "order_empty": "Keine Bestellungen vorhanden."
+    "order_empty": "Keine Bestellungen vorhanden.",
+    "order_placed_by": "Bestellt von"
   }
 }
